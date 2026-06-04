@@ -20,11 +20,12 @@ def _load_credentials(credentials):
         os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
         or os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
     )
-    if service_account_json:
+    if service_account_json and service_account_json.strip():
         return credentials.Certificate(json.loads(service_account_json))
 
     cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if cred_path:
+    if cred_path and cred_path.strip():
+        cred_path = cred_path.strip()
         if cred_path.lstrip().startswith("{"):
             return credentials.Certificate(json.loads(cred_path))
         if os.path.exists(cred_path):

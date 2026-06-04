@@ -1,10 +1,23 @@
 """
-Mentora – Detector Pool
+Mentora - Detector Pool
 Manages one FatigueDetector instance per active session.
 """
 
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "ai_model"))
+import sys
+from pathlib import Path
+
+
+_HERE = Path(__file__).resolve()
+_AI_MODEL_CANDIDATES = (
+    _HERE.parents[2] / "ai_model",  # repo root / ai_model
+    _HERE.parents[1] / "ai_model",  # Docker /app/ai_model
+)
+
+for _ai_model_dir in _AI_MODEL_CANDIDATES:
+    if _ai_model_dir.exists():
+        sys.path.insert(0, str(_ai_model_dir))
+        sys.path.insert(0, str(_ai_model_dir.parent))
+        break
 
 from fatigue_detector import FatigueDetector
 
