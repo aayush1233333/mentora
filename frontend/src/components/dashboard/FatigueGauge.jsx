@@ -14,7 +14,7 @@ const STATE_COLORS = {
  * @param {number} size    diameter in px (default 200)
  */
 export default function FatigueGauge({ score = 0, state = "Normal", size = 200 }) {
-  const { stroke, glow, label } = STATE_COLORS[state] || STATE_COLORS.Unknown;
+  const { stroke, glow } = STATE_COLORS[state] || STATE_COLORS.Unknown;
 
   const r   = (size / 2) * 0.78;
   const cx  = size / 2;
@@ -25,10 +25,6 @@ export default function FatigueGauge({ score = 0, state = "Normal", size = 200 }
   const progress = Math.min(score, 100) / 100;
   const dashArr  = circumference * sweep;
   const dashOff  = dashArr * (1 - progress);
-
-  const startAngle = -225 * (Math.PI / 180);
-  const x0 = cx + r * Math.cos(startAngle);
-  const y0 = cy + r * Math.sin(startAngle);
 
   return (
     <div className="relative flex flex-col items-center">

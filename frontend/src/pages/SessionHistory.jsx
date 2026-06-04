@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Download, Trash2, ChevronRight, Clock, BarChart2, Calendar, RefreshCw } from "lucide-react";
+import { Download, Trash2, Clock, BarChart2, Calendar, RefreshCw } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useSessionHistory } from "../hooks/useSessionHistory";
 import api from "../utils/api";
@@ -71,12 +71,10 @@ function SessionRow({ session, dark, onDelete, onExport }) {
 export default function SessionHistory() {
   const { dark } = useTheme();
   const { sessions, loading, error, refresh, deleteSession } = useSessionHistory(50);
-  const [exporting, setExporting] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const navigate = useNavigate();
 
   const handleExport = async (sessionId) => {
-    setExporting(sessionId);
     try {
       const res = await api.get(`/report?session_id=${sessionId}&format=pdf`, { responseType: "blob" });
       const url = URL.createObjectURL(res.data);
@@ -86,7 +84,6 @@ export default function SessionHistory() {
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* show toast in prod */ }
-    finally { setExporting(null); }
   };
 
   const handleDelete = async (sessionId) => {

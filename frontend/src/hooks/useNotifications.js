@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 import { requestFCMToken, onForegroundMessage } from "../utils/firebase";
 
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes between alerts
+
 /**
  * useNotifications – requests FCM permission, registers token, handles
  * foreground push messages, and triggers local browser notifications
@@ -8,7 +10,6 @@ import { requestFCMToken, onForegroundMessage } from "../utils/firebase";
  */
 export function useNotifications(fatigueScore, state) {
   const lastAlertRef   = useRef({ state: null, ts: 0 });
-  const COOLDOWN_MS    = 5 * 60 * 1000; // 5 minutes between alerts
 
   // Request notification permission + FCM token on mount
   useEffect(() => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { Activity, Eye, Wind, Zap, TrendingUp, Play, Lightbulb } from "lucide-react";
+import { Activity, Eye, Wind, Zap, TrendingUp, Play } from "lucide-react";
 import { useSession } from "../context/SessionContext";
 import { useTheme } from "../context/ThemeContext";
 import FatigueGauge from "../components/dashboard/FatigueGauge";
@@ -46,7 +46,6 @@ export default function Dashboard() {
     }
   }, [state, active]); // eslint-disable-line
 
-  const stateColor = { Normal: "#10b981", Stressed: "#f59e0b", Fatigued: "#ef4444" };
   const chartData = active
     ? history.slice(-60).map((h, i) => ({ t: i, score: h.score }))
     : weekly.map(d => ({ t: d.date?.slice(5), score: d.avg_fatigue }));
