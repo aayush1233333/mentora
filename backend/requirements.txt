@@ -9,6 +9,6 @@ numpy==1.26.4
 opencv-python-headless==4.9.0.80
 mediapipe==0.10.14
 scipy==1.13.0
-tensorflow==2.16.1          # or torch if preferred
+tensorflow-cpu==2.16.1          # or torch if preferred
 python-dotenv==1.0.1
 httpx==0.27.0
