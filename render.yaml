@@ -13,7 +13,7 @@ services:
       - key: PYTHONPATH
         value: /opt/render/project/src
       - key: CORS_ORIGINS
-        value: https://mentora-app-626f7.web.app
+        value: https://mentora-repoo.vercel.app
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
       - key: OPENAI_API_KEY
