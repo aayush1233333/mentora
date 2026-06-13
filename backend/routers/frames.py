@@ -39,7 +39,7 @@ async def process_frame(
     body: ProcessFrameRequest,
     user=Depends(get_current_user),
 ):
-    # ── Decode frame ─────────────────────────────────────────────────────────
+    # ── Decode frame ────────────────────────────────────────────────────────
     try:
         img_bytes = base64.b64decode(body.frame_b64)
         nparr     = np.frombuffer(img_bytes, np.uint8)
@@ -50,7 +50,7 @@ async def process_frame(
     if frame is None:
         raise HTTPException(status_code=422, detail="Could not decode image")
 
-    # ── Run detector ─────────────────────────────────────────────────────────
+    # ── Run detector ────────────────────────────────────────────────────────
     detector = pool.get(body.session_id)
     result   = detector.process_frame(frame)
 

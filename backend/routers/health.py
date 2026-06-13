@@ -8,7 +8,7 @@ GET /health/stats  → internal cache + detector pool stats (admin only in prod)
 import os
 import time
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from services.cache_service import cache_stats
 from services.detector_service import DetectorPool
 
