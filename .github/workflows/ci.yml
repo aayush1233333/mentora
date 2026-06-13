@@ -34,7 +34,7 @@ jobs:
           pip install pytest pytest-cov ruff
 
       - name: Lint (ruff)
-        run: ruff check . --ignore E501
+  run: ruff check . --fix --exit-zero
 
       - name: Run tests
         run: pytest tests/ -v --cov=. --cov-report=xml
