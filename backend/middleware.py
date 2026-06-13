@@ -58,6 +58,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return forwarded.split(",")[0].strip() if forwarded else request.client.host or "unknown"
 
     async def dispatch(self, request: Request, call_next):
+        # Allow CORS preflight requests to pass through immediately
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if path in self.LIMITS:
             ip       = self._get_ip(request)
@@ -82,6 +86,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 class RequestLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Allow CORS preflight requests to pass through immediately
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         req_id = str(uuid.uuid4())[:8]
         start  = time.perf_counter()
 
@@ -119,6 +127,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     }
 
     async def dispatch(self, request: Request, call_next):
+        # Allow CORS preflight requests to pass through without adding security headers
+        # that could interfere with the CORS response
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         response = await call_next(request)
         for key, value in self.HEADERS.items():
             response.headers[key] = value
