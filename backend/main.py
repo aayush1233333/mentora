@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    logger.info(f"🌐 CORS origins: {cors_origins}")
     logger.info("🧠  Mentora backend starting up …")
     yield
     logger.info("🔴  Mentora backend shutting down.")
