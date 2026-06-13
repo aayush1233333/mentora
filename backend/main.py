@@ -30,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-    logger.info(f"🌐 CORS origins: {cors_origins}")
     logger.info("🧠  Mentora backend starting up …")
     yield
     logger.info("🔴  Mentora backend shutting down.")
@@ -46,7 +44,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Middleware (registered outer → inner) ─────────────────────────────────────
+# ── Middleware ─────────────────────────────────────────────────────────────────
+# Registered in reverse order of execution:
+# CORSMiddleware runs FIRST (registered last) to handle preflight before anything else
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(RateLimitMiddleware)
@@ -55,26 +55,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    max_age=600,
 )
 
-# ── Global OPTIONS handler for CORS preflight ─────────────────────────────────
-@app.options("/{rest_of_path:path}")
-async def preflight_handler(rest_of_path: str, request: Request):
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Max-Age": "600",
-        }
-    )
-
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(health.router)                                          # /health*
+app.include_router(health.router)
 app.include_router(session.router,       prefix="/api/v1", tags=["Session"])
 app.include_router(sessions_list.router, prefix="/api/v1", tags=["Sessions"])
 app.include_router(frames.router,        prefix="/api/v1", tags=["Frames"])
