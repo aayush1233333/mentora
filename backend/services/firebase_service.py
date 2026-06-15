@@ -41,7 +41,7 @@ try:
         cred = _load_credentials(credentials)
         firebase_admin.initialize_app(cred)
 
-    _db = firestore.client(database="default")
+    _db = firestore.client()
     logger.info("Firestore connected ✓")
 except Exception as e:
     logger.warning(f"Firebase unavailable ({e}) – using in-memory stub.")
