@@ -44,29 +44,30 @@ class FatigueDetector:
     """
 
     def __init__(self):
-       self.face_mesh = mp.solutions.face_mesh.FaceMesh(
-          max_num_faces=1,
-          refine_landmarks=True,
-          min_detection_confidence=0.5,
-          min_tracking_confidence=0.5,
-       )
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
 
-       self.ear_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
-       self.mar_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
+        self.ear_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
+        self.mar_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
+        self.fatigue_score_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
 
-       self._pose_estimator = HeadPoseEstimator() if _HEAD_POSE_AVAILABLE else None
+        self._pose_estimator = HeadPoseEstimator() if _HEAD_POSE_AVAILABLE else None
 
-       self.blink_counter = 0
-       self.blink_total = 0
-       self.yawn_counter = 0
-       self.yawn_total = 0
-       self._yawn_started_at: Optional[float] = None
-       self._yawn_active = False
-       self.frame_count = 0
-       self.session_start = time.time()
+        self.blink_counter = 0
+        self.blink_total = 0
+        self.yawn_counter = 0
+        self.yawn_total = 0
+        self._yawn_started_at: Optional[float] = None
+        self._yawn_active = False
+        self.frame_count = 0
+        self.session_start = time.time()
 
-       self._last_minute_blinks = deque(maxlen=300)
-       self._timestamps: deque = deque(maxlen=300)
+        self._last_minute_blinks = deque(maxlen=300)
+        self._timestamps: deque = deque(maxlen=300)
 
     @staticmethod
     def _eye_aspect_ratio(landmarks, eye_indices, w, h) -> float:
@@ -181,6 +182,7 @@ class FatigueDetector:
 
         score = self._compute_fatigue_score(ear, mar)
         state = self._classify_state(score, mar, ear)
+        self.fatigue_score_buffer.append(score)
 
         return {
             "fatigue_score": score,
@@ -210,6 +212,7 @@ class FatigueDetector:
     def reset(self):
         self.ear_buffer.clear()
         self.mar_buffer.clear()
+        self.fatigue_score_buffer.clear()
         self.blink_counter = self.blink_total = 0
         self.yawn_counter = self.yawn_total = 0
         self._yawn_started_at = None
@@ -219,11 +222,16 @@ class FatigueDetector:
 
     def get_session_summary(self) -> Dict:
         elapsed = time.time() - self.session_start
-        avg_score = float(np.mean(list(self.ear_buffer))) if self.ear_buffer else 0
+        avg_ear = float(np.mean(list(self.ear_buffer))) if self.ear_buffer else 0
+        avg_fatigue_score = (
+            float(np.mean(list(self.fatigue_score_buffer)))
+            if self.fatigue_score_buffer else 0
+        )
         return {
-            "duration_seconds": round(elapsed, 1),
-            "total_blinks": self.blink_total,
-            "total_yawns": self.yawn_total,
-            "avg_ear": round(avg_score, 4),
-            "frames_processed": self.frame_count,
+            "duration_seconds":  round(elapsed, 1),
+            "total_blinks":      self.blink_total,
+            "total_yawns":       self.yawn_total,
+            "avg_ear":           round(avg_ear, 4),
+            "avg_fatigue_score": round(avg_fatigue_score, 1),
+            "frames_processed":  self.frame_count,
         }

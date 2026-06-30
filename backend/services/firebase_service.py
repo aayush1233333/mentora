@@ -69,6 +69,19 @@ class FirebaseService:
         return snap.to_dict() if snap.exists else None
 
     def update_session_metrics(self, session_id: str, new_score: float):
+        """
+        Lightweight per-frame update. Only increments frame_count atomically.
+
+        peak_fatigue and avg_fatigue are NOT computed here: Firestore has no
+        atomic MAX() operation (firebase_admin.firestore.MAX does not exist —
+        the old hasattr() guard always failed and silently fell back to
+        overwriting peak_fatigue with the latest score, which is wrong).
+
+        Instead, every frame's score is already persisted via
+        add_fatigue_entry() into the fatigue_data subcollection, so both
+        avg_fatigue and peak_fatigue are derived correctly in one pass over
+        that subcollection at finalise_session() time — see below.
+        """
         if _STUB_MODE:
             s = _stub["sessions"].get(session_id, {})
             s["frame_count"]  = s.get("frame_count", 0) + 1
@@ -79,18 +92,16 @@ class FirebaseService:
             return
         ref = _db.collection("sessions").document(session_id)
         from firebase_admin import firestore as _fs
-        ref.update({
-            "frame_count":  _fs.Increment(1),
-            "peak_fatigue": _fs.MAX(new_score) if hasattr(_fs, "MAX") else new_score,
-        })
+        ref.update({"frame_count": _fs.Increment(1)})
 
     def finalise_session(self, session_id: str) -> dict:
         entries = self.get_fatigue_entries(session_id)
         scores  = [e.get("fatigue_score", 0) for e in entries]
         update  = {
-            "ended_at":  time.time(),
-            "status":    "completed",
-            "avg_fatigue": round(sum(scores) / len(scores), 1) if scores else 0,
+            "ended_at":     time.time(),
+            "status":       "completed",
+            "avg_fatigue":  round(sum(scores) / len(scores), 1) if scores else 0,
+            "peak_fatigue": max(scores) if scores else 0,
         }
         if _STUB_MODE:
             _stub["sessions"].get(session_id, {}).update(update)
@@ -173,11 +184,22 @@ class FirebaseService:
         daily: dict = {}
         for s in sessions:
             day = time.strftime("%Y-%m-%d", time.localtime(s["started_at"]))
-            daily.setdefault(day, {"date": day, "sessions": 0, "avg_fatigue": 0, "total_time_min": 0})
-            daily[day]["sessions"] += 1
-            daily[day]["avg_fatigue"] = round(
-                (daily[day]["avg_fatigue"] + s.get("avg_fatigue", 0)) / 2, 1)
+            daily.setdefault(day, {
+                "date": day,
+                "sessions": 0,
+                "_fatigue_sum": 0,   # internal accumulator, stripped before return
+                "avg_fatigue": 0,
+                "total_time_min": 0,
+            })
+            daily[day]["sessions"]     += 1
+            daily[day]["_fatigue_sum"] += s.get("avg_fatigue", 0)
+            daily[day]["avg_fatigue"]   = round(
+                daily[day]["_fatigue_sum"] / daily[day]["sessions"], 1)
             duration = ((s.get("ended_at") or time.time()) - s["started_at"]) / 60
             daily[day]["total_time_min"] = round(daily[day]["total_time_min"] + duration, 1)
+
+        # Strip the internal accumulator before returning to callers.
+        for d in daily.values():
+            d.pop("_fatigue_sum", None)
 
         return {"days": sorted(daily.values(), key=lambda x: x["date"])}

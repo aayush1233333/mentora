@@ -37,17 +37,18 @@ jobs:
         run: ruff check . --fix --exit-zero
 
       - name: Test
-        run: pytest tests/ -v --cov=. --cov-report=xml
-        continue-on-error: true
+        working-directory: .
+        run: pytest backend/tests/ -v --cov=backend --cov-report=xml
         env:
           ENV: development
           GOOGLE_APPLICATION_CREDENTIALS: ""
+          PYTHONPATH: .:backend:ai_model
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         continue-on-error: true
         with:
-          file: backend/coverage.xml
+          file: coverage.xml
           flags: backend
 
   # ── Frontend build & lint ─────────────────────────────────────────────────

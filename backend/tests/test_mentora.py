@@ -3,7 +3,7 @@ Mentora – Backend Test Suite
 Run: pytest tests/ -v
 """
 
-import sys, os
+import sys, os, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import numpy as np
@@ -161,6 +161,33 @@ class TestFirebaseServiceStub:
         summary = self.svc.finalise_session("s3")
         assert summary["status"] == "completed"
         assert summary["avg_fatigue"] == 50.0
+        # peak_fatigue must be the true max across all frames, not just the
+        # most recently written score (regression test for the removed
+        # _fs.MAX() bug, which always fell back to overwriting with the
+        # latest score).
+        assert summary["peak_fatigue"] == 60
+
+    def test_weekly_analytics_correct_average_for_three_plus_sessions(self):
+        """
+        Regression test: daily avg_fatigue must be a true mean across all
+        sessions in a day, not a naive (prev + new) / 2 rolling average
+        (which overweights later sessions — e.g. previously produced 22.5
+        for scores [10, 20, 30] instead of the correct 20.0).
+        """
+        now = time.time() - 3600  # 1 hour ago — comfortably inside the 7-day window
+        for i, score in enumerate([10, 20, 30]):
+            sid = f"week-{i}"
+            self.svc.create_session(sid, {
+                "session_id": sid, "user_id": "u1",
+                "started_at": now + i, "ended_at": now + i + 60,
+                "status": "completed", "avg_fatigue": score,
+                "peak_fatigue": score, "frame_count": 1,
+            })
+        result = self.svc.get_weekly_analytics("u1")
+        assert len(result["days"]) == 1
+        day = result["days"][0]
+        assert day["sessions"] == 3
+        assert day["avg_fatigue"] == 20.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────

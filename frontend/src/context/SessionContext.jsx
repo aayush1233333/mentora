@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useRef } from "react";
 import api from "../utils/api";
+import { auth } from "../utils/firebase";
 
 const SessionContext = createContext(null);
 export const useSession = () => useContext(SessionContext);
@@ -48,12 +49,28 @@ export function SessionProvider({ children }) {
     const { session_id } = res.data;
     dispatch({ type: "START", payload: { sessionId: session_id } });
 
-    // Open WebSocket
-    const wsUrl = `${process.env.REACT_APP_WS_URL || "ws://localhost:8000"}/ws/${session_id}`;
+    // ── Open WebSocket with Firebase ID token for authentication ─────────────
+    // The backend expects: ws://host/ws/{session_id}?token=<firebase-id-token>
+    // We fetch a fresh token here so it isn't stale by the time the server
+    // verifies it. Falls back to an empty string in dev (stub auth active).
+    let token = "";
+    try {
+      if (auth.currentUser) {
+        token = await auth.currentUser.getIdToken();
+      }
+    } catch (e) {
+      console.warn("Could not fetch ID token for WebSocket auth:", e);
+    }
+
+    const baseWsUrl = process.env.REACT_APP_WS_URL || "ws://localhost:8000";
+    const wsUrl = `${baseWsUrl}/ws/${session_id}?token=${encodeURIComponent(token)}`;
     wsRef.current = new WebSocket(wsUrl);
     wsRef.current.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.type === "frame_result") dispatch({ type: "FRAME", payload: data });
+    };
+    wsRef.current.onerror = (e) => {
+      console.error("WebSocket error:", e);
     };
     return session_id;
   };

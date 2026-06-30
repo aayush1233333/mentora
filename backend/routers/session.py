@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from services.firebase_service import FirebaseService
 from services.auth_service import get_current_user
+from services.detector_service import pool
 
 router = APIRouter()
 firebase = FirebaseService()
@@ -68,4 +69,10 @@ async def end_session(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     summary = firebase.finalise_session(body.session_id)
+
+    # Release the FatigueDetector instance for this session (frees the
+    # MediaPipe FaceMesh model from memory). Without this, every completed
+    # session leaks its detector indefinitely.
+    pool.remove(body.session_id)
+
     return {"message": "Session ended", "summary": summary}
