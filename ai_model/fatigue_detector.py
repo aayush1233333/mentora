@@ -1,15 +1,33 @@
 """
 Mentora - Fatigue Detector Core
-Uses MediaPipe + EAR/MAR feature extraction.
+Uses MediaPipe Tasks (FaceLandmarker) + EAR/MAR feature extraction.
+
+NOTE: This was migrated from the legacy `mp.solutions.face_mesh` API to the
+current `mp.tasks.vision.FaceLandmarker` API. Google ended support for
+MediaPipe Legacy Solutions on March 1, 2023, and as of mid-2025/2026 the
+`mp.solutions` submodule is no longer reliably bundled in PyPI wheels for
+several platforms (observed: Linux x86_64, the platform GitHub Actions
+runners use). The legacy API call `mp.solutions.face_mesh.FaceMesh(...)`
+raises `AttributeError: module 'mediapipe' has no attribute 'solutions'`
+on those builds. See: https://ai.google.dev/edge/mediapipe/solutions/guide
+
+Landmark indices (LEFT_EYE_IDX, RIGHT_EYE_IDX, MOUTH_IDX) are UNCHANGED —
+the new FaceLandmarker uses the same 468/478-point face mesh topology as
+the legacy FaceMesh solution, just with a different access path to reach
+the per-landmark x/y/z coordinates.
 """
 
 from collections import deque
 import logging
+import os
 import time
+from pathlib import Path
 from typing import Dict, Optional
 
 import cv2
 import mediapipe as mp
+from mediapipe.tasks import python as mp_tasks_python
+from mediapipe.tasks.python import vision as mp_tasks_vision
 import numpy as np
 from scipy.spatial import distance as dist
 
@@ -22,7 +40,8 @@ try:
 except ImportError:
     _HEAD_POSE_AVAILABLE = False
 
-# MediaPipe indices for eyes / mouth.
+# MediaPipe indices for eyes / mouth. Unchanged from the legacy FaceMesh
+# topology — the FaceLandmarker task uses the same 478-point face model.
 LEFT_EYE_IDX = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE_IDX = [362, 385, 387, 263, 373, 380]
 MOUTH_IDX = [61, 291, 39, 269, 0, 17]
@@ -36,6 +55,16 @@ YAWN_CLOSE_THRESHOLD = 0.45
 YAWN_MIN_DURATION = 1.5
 FATIGUE_WINDOW = 90
 
+# Path to the FaceLandmarker .task model bundle. Expected to be downloaded
+# into ai_model/weights/face_landmarker.task during the Docker build (see
+# backend/Dockerfile) or CI setup (see .github/workflows/ci.yml) — it is
+# NOT committed to the repo (binary, ~3.7MB, gitignored).
+#
+# Override with the MEDIAPIPE_FACE_LANDMARKER_MODEL_PATH env var if you
+# store it somewhere else (e.g. a mounted volume in a different deployment).
+_DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "weights" / "face_landmarker.task"
+MODEL_PATH = Path(os.getenv("MEDIAPIPE_FACE_LANDMARKER_MODEL_PATH", str(_DEFAULT_MODEL_PATH)))
+
 
 class FatigueDetector:
     """
@@ -44,12 +73,29 @@ class FatigueDetector:
     """
 
     def __init__(self):
-        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(
+                f"FaceLandmarker model not found at {MODEL_PATH}. "
+                "Download it with:\n"
+                "  curl -L -o "
+                f"{MODEL_PATH} "
+                "https://storage.googleapis.com/mediapipe-models/face_landmarker/"
+                "face_landmarker/float16/latest/face_landmarker.task\n"
+                "or set MEDIAPIPE_FACE_LANDMARKER_MODEL_PATH to its location."
+            )
+
+        base_options = mp_tasks_python.BaseOptions(model_asset_path=str(MODEL_PATH))
+        options = mp_tasks_vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            running_mode=mp_tasks_vision.RunningMode.IMAGE,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
             min_tracking_confidence=0.5,
+            output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False,
         )
+        self.face_landmarker = mp_tasks_vision.FaceLandmarker.create_from_options(options)
 
         self.ear_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
         self.mar_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
@@ -68,6 +114,20 @@ class FatigueDetector:
 
         self._last_minute_blinks = deque(maxlen=300)
         self._timestamps: deque = deque(maxlen=300)
+
+    def close(self):
+        """Releases the underlying FaceLandmarker task graph. Call this when
+        a session ends to free native resources (mirrors the DetectorPool
+        cleanup pattern in backend/services/detector_service.py)."""
+        if hasattr(self, "face_landmarker") and self.face_landmarker is not None:
+            self.face_landmarker.close()
+            self.face_landmarker = None
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
 
     @staticmethod
     def _eye_aspect_ratio(landmarks, eye_indices, w, h) -> float:
@@ -156,12 +216,21 @@ class FatigueDetector:
         """
         h, w = frame_bgr.shape[:2]
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        result = self.face_mesh.process(rgb)
 
-        if not result.multi_face_landmarks:
+        # FaceLandmarker (mp.tasks) requires the input wrapped in an
+        # mp.Image, unlike the legacy FaceMesh.process() which accepted a
+        # raw numpy array directly.
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        result = self.face_landmarker.detect(mp_image)
+
+        if not result.face_landmarks:
             return self._empty_result()
 
-        lm = result.multi_face_landmarks[0].landmark
+        # New API: result.face_landmarks[0] is a list of NormalizedLandmark
+        # objects with the same .x / .y / .z attributes as the legacy API's
+        # result.multi_face_landmarks[0].landmark — so everything downstream
+        # of `lm` (EAR/MAR math, head pose) is unchanged.
+        lm = result.face_landmarks[0]
 
         ear_l = self._eye_aspect_ratio(lm, LEFT_EYE_IDX, w, h)
         ear_r = self._eye_aspect_ratio(lm, RIGHT_EYE_IDX, w, h)
