@@ -10,13 +10,12 @@ import time
 import logging
 from fastapi import APIRouter
 from services.cache_service import cache_stats
-from services.detector_service import DetectorPool
+from services.detector_service import pool
 
 router = APIRouter(tags=["Health"])
 logger = logging.getLogger(__name__)
 
 _start_time = time.time()
-_pool = DetectorPool()
 
 
 @router.get("/health")
@@ -72,6 +71,6 @@ async def internal_stats():
         return {"message": "Stats endpoint disabled in production by default."}
     return {
         "cache":   cache_stats(),
-        "active_sessions": len(_pool._pool),
+        "active_sessions": pool.session_count(),
         "uptime_s": round(time.time() - _start_time, 1),
     }

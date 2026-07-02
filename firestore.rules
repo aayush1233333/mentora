@@ -9,7 +9,17 @@ service cloud.firestore {
 
     // ── Sessions ──────────────────────────────────────────────────────────
     match /sessions/{sessionId} {
-      allow read, create: if request.auth != null;
+      // Read: only the owner can read their own session.
+      // (Previously: any authenticated user could read ANY session by ID.)
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.user_id;
+
+      // Create: only allowed if the new document's user_id matches the
+      // caller's own uid — prevents creating sessions on behalf of others.
+      // (Previously: any authenticated user could set user_id to anyone's UID.)
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.user_id;
+
       allow update, delete: if request.auth != null
         && request.auth.uid == resource.data.user_id;
 

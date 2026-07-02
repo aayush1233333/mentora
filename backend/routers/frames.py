@@ -8,19 +8,27 @@ import time
 import numpy as np
 import cv2
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from services.firebase_service import FirebaseService
 from services.auth_service import get_current_user
-from services.detector_service import DetectorPool
+from services.detector_service import pool
 
 router   = APIRouter()
 firebase = FirebaseService()
-pool     = DetectorPool()
+
+# A typical webcam JPEG frame at modest resolution (e.g. 640x480, decent
+# quality) base64-encodes to well under 200 KB. We cap at 700 KB base64
+# (~525 KB raw image) to comfortably allow higher-resolution frames while
+# still rejecting abusive payloads before any decode/CPU work happens.
+_MAX_FRAME_B64_CHARS = 700_000
 
 
 class ProcessFrameRequest(BaseModel):
     session_id: str
-    frame_b64:  str          # base64-encoded JPEG (no data-URI prefix)
+    frame_b64:  str = Field(
+        max_length=_MAX_FRAME_B64_CHARS,
+        description="base64-encoded JPEG (no data-URI prefix)",
+    )
     timestamp:  float | None = None
 
 

@@ -33,6 +33,12 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov ruff
 
+      - name: Install system dependencies
+        # MediaPipe Tasks C++ runtime requires EGL/OpenGL ES shared libraries
+        # even on headless CI runners (no GPU needed, just the .so files).
+        run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends libgles2 libegl1
+        working-directory: .
+
       - name: Download FaceLandmarker model
         # Tests instantiate FatigueDetector() directly on the runner (not
         # inside Docker), so the .task model must be present here too.

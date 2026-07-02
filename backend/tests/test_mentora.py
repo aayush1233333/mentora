@@ -3,11 +3,12 @@ Mentora – Backend Test Suite
 Run: pytest tests/ -v
 """
 
-import sys, os
+import sys, os, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import numpy as np
 import pytest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
@@ -15,6 +16,42 @@ from unittest.mock import MagicMock, patch
 # AI Model tests
 # ─────────────────────────────────────────────────────────────────────────────
 
+# FatigueDetector now uses the MediaPipe Tasks FaceLandmarker API which
+# requires a downloaded .task model file at ai_model/weights/face_landmarker.task.
+# In CI this file is fetched by the "Download FaceLandmarker model" step.
+# Locally, run: curl -L -o ai_model/weights/face_landmarker.task \
+#   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+_MODEL_PATH = Path(__file__).resolve().parents[3] / "ai_model" / "weights" / "face_landmarker.task"
+_MODEL_AVAILABLE = _MODEL_PATH.exists()
+
+# Also verify the MediaPipe Tasks C++ runtime can actually load.
+# It needs EGL/GLES shared libraries even on headless systems.
+# We catch BaseException (not just Exception) since ctypes OSError
+# can sometimes propagate outside normal exception hierarchy on some platforms.
+if _MODEL_AVAILABLE:
+    try:
+        import mediapipe as _mp
+        from mediapipe.tasks import python as _mpt
+        from mediapipe.tasks.python import vision as _mptv
+        _base_opts = _mpt.BaseOptions(model_asset_path=str(_MODEL_PATH))
+        _fl_opts  = _mptv.FaceLandmarkerOptions(
+            base_options=_base_opts,
+            running_mode=_mptv.RunningMode.IMAGE,
+        )
+        _probe = _mptv.FaceLandmarker.create_from_options(_fl_opts)
+        _probe.close()
+        del _base_opts, _fl_opts, _probe
+        _DETECTOR_AVAILABLE = True
+    except BaseException:
+        _DETECTOR_AVAILABLE = False
+else:
+    _DETECTOR_AVAILABLE = False
+
+@pytest.mark.skipif(not _DETECTOR_AVAILABLE, reason=(
+    "FaceLandmarker not available: model file missing or MediaPipe Tasks "
+    "C++ runtime failed to load (libGLESv2.so.2 missing — "
+    "install: sudo apt-get install libgles2)"
+))
 class TestFatigueDetector:
     """Tests for the rule-based fatigue detector (no real webcam needed)."""
 

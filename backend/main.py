@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from middleware import RateLimitMiddleware, RequestLogMiddleware, SecurityHeadersMiddleware
 
 load_dotenv(Path(__file__).with_name(".env"))
 
@@ -42,7 +43,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS first, before everything else ────────────────────────────────────────
+# ── Middleware stack (registered last = outermost = runs first) ───────────────
+#
+#   Request flow:  SecurityHeaders → RequestLog → RateLimit → CORS → GZip → route
+#   Response flow: route → GZip → CORS → RateLimit → RequestLog → SecurityHeaders
+#
+# CORS must be innermost so that rate-limit 429s still carry correct CORS headers.
+# SecurityHeaders must be outermost so every response (including 429s) gets them.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
@@ -52,6 +60,9 @@ app.add_middleware(
     max_age=600,
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RequestLogMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health.router)

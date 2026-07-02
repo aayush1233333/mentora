@@ -31,7 +31,7 @@ def build_pdf_report(report: dict) -> bytes:
         title_style = ParagraphStyle("title", parent=styles["Title"],
                                      fontSize=22, textColor=colors.HexColor("#6C63FF"),
                                      spaceAfter=4)
-        story.append(Paragraph("🧠 Mentora – Session Report", title_style))
+        story.append(Paragraph("Mentora – Session Report", title_style))
         story.append(Paragraph(
             f"Generated: {time.strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#6C63FF")))

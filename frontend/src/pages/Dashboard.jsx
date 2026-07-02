@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { Activity, Eye, Wind, Zap, TrendingUp, Play } from "lucide-react";
@@ -38,13 +38,27 @@ export default function Dashboard() {
     api.get("/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
   }, []);
 
-  // Auto-suggest breathing when stressed/fatigued
+  // Auto-suggest breathing when stressed/fatigued.
+  // Tracks whether we've already auto-prompted for the CURRENT high-fatigue
+  // streak in a ref (not state), so dismissing the widget doesn't leave a
+  // stale `false` baked into a closure that never re-fires. The streak
+  // resets once fatigueScore drops back below the threshold, allowing a
+  // fresh prompt next time it crosses 35 again.
+  const hasPromptedForStreak = useRef(false);
+
   useEffect(() => {
-    if (active && fatigueScore >= 35 && !showBreathing) {
-      const timer = setTimeout(() => setShowBreathing(true), 3000);
-      return () => clearTimeout(timer);
+    if (!active || fatigueScore < 35) {
+      hasPromptedForStreak.current = false;
+      return;
     }
-  }, [state, active]); // eslint-disable-line
+    if (hasPromptedForStreak.current) return;
+
+    const timer = setTimeout(() => {
+      setShowBreathing(true);
+      hasPromptedForStreak.current = true;
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [active, fatigueScore]);
 
   const chartData = active
     ? history.slice(-60).map((h, i) => ({ t: i, score: h.score }))

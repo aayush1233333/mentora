@@ -1,9 +1,15 @@
 """
 Mentora - Detector Pool
 Manages one FatigueDetector instance per active session.
+
+This module owns the single, process-wide DetectorPool instance (`pool`).
+All routers must import `pool` from here rather than instantiating their
+own DetectorPool() — multiple instances each get their own empty dict,
+which silently breaks session lookup, cleanup, and health stats.
 """
 
 import sys
+import threading
 from pathlib import Path
 
 
@@ -27,15 +33,28 @@ class DetectorPool:
 
     def __init__(self):
         self._pool: dict[str, FatigueDetector] = {}
+        self._lock = threading.Lock()
 
     def get(self, session_id: str) -> FatigueDetector:
-        if session_id not in self._pool:
-            self._pool[session_id] = FatigueDetector()
-        return self._pool[session_id]
+        with self._lock:
+            if session_id not in self._pool:
+                self._pool[session_id] = FatigueDetector()
+            return self._pool[session_id]
 
     def remove(self, session_id: str):
-        self._pool.pop(session_id, None)
+        with self._lock:
+            self._pool.pop(session_id, None)
 
     def summary(self, session_id: str) -> dict:
-        d = self._pool.get(session_id)
+        with self._lock:
+            d = self._pool.get(session_id)
         return d.get_session_summary() if d else {}
+
+    def session_count(self) -> int:
+        with self._lock:
+            return len(self._pool)
+
+
+# ── Process-wide singleton ────────────────────────────────────────────────────
+# Import this, don't instantiate your own DetectorPool().
+pool = DetectorPool()
