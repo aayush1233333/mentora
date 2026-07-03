@@ -2,38 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users ─────────────────────────────────────────────────────────────
+    // ── Users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
     }
 
-    // ── Sessions ──────────────────────────────────────────────────────────
+    // ── Sessions ───────────────────────────────────────────────────────────
     match /sessions/{sessionId} {
-      // Read: only the owner can read their own session.
-      // (Previously: any authenticated user could read ANY session by ID.)
       allow read: if request.auth != null
         && request.auth.uid == resource.data.user_id;
 
-      // Create: only allowed if the new document's user_id matches the
-      // caller's own uid — prevents creating sessions on behalf of others.
-      // (Previously: any authenticated user could set user_id to anyone's UID.)
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.user_id;
 
       allow update, delete: if request.auth != null
         && request.auth.uid == resource.data.user_id;
 
-      // Fatigue data sub-collection
       match /fatigue_data/{entryId} {
         allow read, write: if request.auth != null
           && request.auth.uid == get(/databases/$(database)/documents/sessions/$(sessionId)).data.user_id;
       }
     }
 
-    // ── Reports ───────────────────────────────────────────────────────────
+    // ── Reports ────────────────────────────────────────────────────────────
     match /reports/{reportId} {
       allow read, write: if request.auth != null
         && request.auth.uid == resource.data.user_id;
+    }
+
+    // ── Wellness / notifications ───────────────────────────────────────────
+    match /wellness/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId;
     }
   }
 }
