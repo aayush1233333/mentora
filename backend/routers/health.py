@@ -1,7 +1,7 @@
 """
 Mentora – Health Check Router
 GET /health        → basic liveness probe
-GET /health/ready  → readiness probe (checks Firebase + AI model)
+GET /health/ready  → readiness probe (checks supabase_service + AI model)
 GET /health/stats  → internal cache + detector pool stats (admin only in prod)
 """
 
@@ -33,19 +33,19 @@ async def liveness():
 async def readiness():
     """
     Readiness probe – checks:
-      • Firebase Firestore connectivity
+      • Supabase database connectivity
       • AI model availability
     Returns 200 if ready, 503 if degraded.
     """
     checks: dict = {}
     overall = "ok"
-
-    # Firebase check
+    # Supabase database check
     try:
-        from services.firebase_service import _STUB_MODE
-        checks["firebase"] = "stub_mode" if _STUB_MODE else "connected"
+        from services.supabase_client import supabase
+        supabase.table("profiles").select("id").limit(1).execute()
+        checks["supabase"] = "connected"
     except Exception as e:
-        checks["firebase"] = f"error: {e}"
+        checks["supabase"] = f"error: {e}"
         overall = "degraded"
 
     # AI model check (imports only – no inference)
@@ -74,3 +74,7 @@ async def internal_stats():
         "active_sessions": pool.session_count(),
         "uptime_s": round(time.time() - _start_time, 1),
     }
+
+
+
+

@@ -37,3 +37,4 @@ def on_starting(server):
 
 def worker_exit(server, worker):
     server.log.info(f"Worker {worker.pid} exiting cleanly")
+

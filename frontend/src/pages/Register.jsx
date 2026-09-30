@@ -22,7 +22,7 @@ export default function Register() {
       await register(email, password);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message?.replace("Firebase: ", "") || "Registration failed");
+      setError(err.message || "Registration failed");
     } finally { setLoading(false); }
   };
 
@@ -81,3 +81,4 @@ export default function Register() {
     </div>
   );
 }
+

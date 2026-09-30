@@ -92,3 +92,5 @@ def _rule_based_reply(msg: str, score: float | None, state: str | None) -> str:
     return ("I'm tracking your cognitive state in real time. Keep an eye on your fatigue "
             "score dashboard — I'll send you a notification when a break is recommended. "
             "Is there something specific on your mind?")
+
+

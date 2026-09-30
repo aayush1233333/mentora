@@ -1,6 +1,6 @@
 """
 Mentora – Session Router
-POST /start-session  → creates a new session document in Firestore
+POST /start-session  → creates a new session record in Supabase
 POST /end-session    → finalises the session
 """
 
@@ -8,12 +8,12 @@ import uuid
 import time
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from services.firebase_service import FirebaseService
+from services.supabase_service import SupabaseService
 from services.auth_service import get_current_user
 from services.detector_service import pool
 
 router = APIRouter()
-firebase = FirebaseService()
+supabase_service = SupabaseService()
 
 
 class StartSessionRequest(BaseModel):
@@ -49,7 +49,7 @@ async def start_session(
         "avg_fatigue":  0,
         "peak_fatigue": 0,
     }
-    firebase.create_session(session_id, session_doc)
+    supabase_service.create_session(session_id, session_doc)
     return StartSessionResponse(
         session_id=session_id,
         started_at=now,
@@ -62,13 +62,13 @@ async def end_session(
     body: EndSessionRequest,
     user=Depends(get_current_user),
 ):
-    session = firebase.get_session(body.session_id)
+    session = supabase_service.get_session(body.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session["user_id"] != user["uid"]:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    summary = firebase.finalise_session(body.session_id)
+    summary = supabase_service.finalise_session(body.session_id)
 
     # Release the FatigueDetector instance for this session (frees the
     # MediaPipe FaceMesh model from memory). Without this, every completed
@@ -76,3 +76,6 @@ async def end_session(
     pool.remove(body.session_id)
 
     return {"message": "Session ended", "summary": summary}
+
+
+

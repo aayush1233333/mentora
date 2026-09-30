@@ -8,7 +8,7 @@
 
 ```
 Webcam → OpenCV → MediaPipe → Feature Extraction (EAR/MAR)
-      → CNN-LSTM Model → FastAPI → Firebase Firestore
+      → CNN-LSTM Model → FastAPI → Supabase
       → React UI (Dashboard · Monitoring · Reports · Chatbot)
 ```
 
@@ -33,8 +33,8 @@ mentora/
 │   │   ├── chatbot.py          # POST /chatbot
 │   │   └── websocket_router.py # WS /ws/{session_id}
 │   ├── services/
-│   │   ├── firebase_service.py # Firestore CRUD
-│   │   ├── auth_service.py     # Firebase token verification
+│   │   ├── supabase_service.py # Supabase database operations
+│   │   ├── auth_service.py     # Supabase token verification
 │   │   ├── detector_service.py # Per-session detector pool
 │   │   ├── connection_manager.py # WebSocket manager
 │   │   └── report_service.py   # PDF generation (ReportLab)
@@ -46,8 +46,8 @@ mentora/
 │   ├── src/
 │   │   ├── App.jsx             # Router + providers
 │   │   ├── pages/
-│   │   │   ├── Login.jsx       # Firebase Auth login
-│   │   │   ├── Register.jsx    # Firebase Auth register
+│   │   │   ├── Login.jsx       # Supabase Auth login
+│   │   │   ├── Register.jsx    # Supabase Auth register
 │   │   │   ├── Dashboard.jsx   # Live score + charts + Pomodoro
 │   │   │   ├── Monitoring.jsx  # Webcam + real-time AI output
 │   │   │   ├── Reports.jsx     # Analytics + PDF export
@@ -59,7 +59,7 @@ mentora/
 │   │   │       ├── FatigueGauge.jsx      # Animated SVG gauge
 │   │   │       └── PomodoroTimer.jsx     # Pomodoro with ring
 │   │   ├── context/
-│   │   │   ├── AuthContext.jsx   # Firebase auth state
+│   │   │   ├── AuthContext.jsx   # Supabase auth state
 │   │   │   ├── ThemeContext.jsx  # Dark/light mode
 │   │   │   └── SessionContext.jsx # Session + frame state
 │   │   ├── hooks/
@@ -67,16 +67,13 @@ mentora/
 │   │   │   └── usePomodoro.js   # Pomodoro timer logic
 │   │   └── utils/
 │   │       ├── api.js           # Axios instance with auth
-│   │       └── firebase.js      # Firebase SDK init
+│   │       └── supabaseClient.js   # Supabase client init
 │   ├── package.json
 │   ├── tailwind.config.js
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── .env.example
 │
-├── firestore.rules              # Firestore security rules
-├── firestore.indexes.json       # Composite indexes
-├── firebase.json                # Firebase hosting config
 ├── docker-compose.yml           # Full-stack Docker deployment
 └── README.md
 ```
@@ -88,19 +85,14 @@ mentora/
 ### Prerequisites
 - Node.js 20+
 - Python 3.11+
-- A Firebase project (free Spark tier works)
+- A Supabase project
 - Webcam
 
 ---
 
-### 1. Clone & Configure Firebase
+### 1. Configure Supabase
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com)
-2. Create a new project
-3. Enable **Authentication** → Email/Password + Google providers
-4. Enable **Firestore Database** (start in test mode)
-5. Download **Service Account JSON**: Project Settings → Service Accounts → Generate New Private Key
-6. Register a **Web App** and copy the config values
+1. Create a Supabase project at https://supabase.com/dashboard`r`n2. Enable **Authentication** ? Email/Password`r`n3. Create the required database tables and Row Level Security policies`r`n4. Copy the Supabase project URL and publishable key into the frontend `.env.local` file
 
 ---
 
@@ -112,12 +104,7 @@ cd backend
 # Copy and fill environment variables
 cp .env.example .env
 # Edit .env:
-#   GOOGLE_APPLICATION_CREDENTIALS=./firebase-service-account.json
 #   OPENAI_API_KEY=sk-...   (optional – chatbot works without it)
-
-# Place your Firebase service account JSON in backend/
-cp ~/Downloads/your-service-account.json ./firebase-service-account.json
-
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
@@ -141,7 +128,7 @@ cd frontend
 
 # Copy and fill environment variables
 cp .env.example .env
-# Edit .env with your Firebase Web App config values
+# Edit the frontend `.env.local` with your Supabase configuration values
 
 # Install dependencies
 npm install --legacy-peer-deps
@@ -192,7 +179,7 @@ Send `{"type": "ping"}` → receives `{"type": "pong"}`
 
 ### Authentication
 
-All endpoints require `Authorization: Bearer <firebase-id-token>` header.
+All endpoints require `Authorization: Bearer <supabase-access-token>` header.
 The frontend handles this automatically via the Axios interceptor.
 
 ---
@@ -228,7 +215,7 @@ Weighted combination of:
 
 ---
 
-##  Firestore Schema
+## Supabase Database Schema
 
 ```
 users/
@@ -253,11 +240,7 @@ reports/
 
 ##  Push Notifications
 
-1. Enable **Firebase Cloud Messaging** in Firebase Console
-2. Add your **VAPID key** to `frontend/.env`
-3. The app requests notification permission on first login
-4. Notifications fire automatically when fatigue score crosses 65
-
+Push notifications are currently disabled in Mentora.
 ---
 
 ##  Training the CNN-LSTM Model
@@ -283,9 +266,9 @@ model.train(X, y, epochs=30, batch_size=64)
 ##  Privacy & Security
 
 - **No video stored** – frames are decoded in-memory and immediately discarded
-- **No raw images in Firestore** – only numeric metrics (EAR, MAR, scores)
-- **Firebase Auth** – all API endpoints require a valid JWT
-- **Firestore rules** – users can only access their own data
+- **No raw images in Supabase** – only numeric metrics (EAR, MAR, scores)
+- **Supabase Auth** – all API endpoints require a valid JWT
+- **Supabase Row Level Security (RLS)** – users can only access their own data
 - **HTTPS enforced** in production via nginx
 
 ---
@@ -294,11 +277,10 @@ model.train(X, y, epochs=30, batch_size=64)
 
 - [ ] Set `ENV=production` in backend `.env`
 - [ ] Configure `CORS_ORIGINS` to your production domain
-- [ ] Deploy Firestore security rules: `firebase deploy --only firestore:rules`
-- [ ] Create Firestore indexes: `firebase deploy --only firestore:indexes`
-- [ ] Enable Firebase App Check for production
-- [ ] Set up Firebase Cloud Messaging VAPID key
-- [ ] Configure a custom domain in Firebase Hosting (optional)
+- [ ] Configure Supabase Row Level Security policies
+- [ ] Create required Supabase database indexes
+- [ ] Configure production security policies
+- [ ] Push notifications are currently disabled`r`n- [ ] Configure a custom domain in Vercel (optional)
 
 ---
 
@@ -308,14 +290,24 @@ model.train(X, y, epochs=30, batch_size=64)
 |-------|-----------|
 | AI / CV | Python, OpenCV, MediaPipe, TensorFlow/Keras |
 | Backend | FastAPI, Uvicorn, WebSockets |
-| Auth/DB | Firebase Auth, Firestore |
-| Notifications | Firebase Cloud Messaging |
+| Auth/DB | Supabase Auth, Supabase PostgreSQL |
+| Notifications | Push notifications (currently disabled) |
 | Chatbot | OpenAI GPT-4o-mini (+ rule-based fallback) |
 | Frontend | React 18, Tailwind CSS, Recharts |
 | PDF | ReportLab |
 | DevOps | Docker, Docker Compose, nginx |
 
 ---
+
+
+
+
+
+
+
+
+
+
 
 
 

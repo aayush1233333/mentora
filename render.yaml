@@ -14,7 +14,6 @@ services:
         value: /opt/render/project/src
       - key: CORS_ORIGINS
         value: https://mentora-repoo.vercel.app
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
-        sync: false
       - key: OPENAI_API_KEY
         sync: false
+

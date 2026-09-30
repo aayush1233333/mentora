@@ -86,3 +86,4 @@ class WellnessTipsService:
         pool = list(TIPS.get(state, TIPS["Normal"]))
         random.shuffle(pool)
         return pool[:n]
+

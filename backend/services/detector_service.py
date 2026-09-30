@@ -58,3 +58,4 @@ class DetectorPool:
 # ── Process-wide singleton ────────────────────────────────────────────────────
 # Import this, don't instantiate your own DetectorPool().
 pool = DetectorPool()
+

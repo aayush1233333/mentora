@@ -24,3 +24,4 @@ class ConnectionManager:
                 dead.append(ws)
         for ws in dead:
             self.disconnect(ws, session_id)
+

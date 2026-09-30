@@ -13,9 +13,7 @@ build/
 *.env
 !*.env.example
 
-# Firebase service account (NEVER commit)
 *service-account*.json
-*firebase-adminsdk*.json
 
 # Model weights
 ai_model/weights/*.h5
@@ -39,3 +37,25 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
+
+
+# Local development secrets and backups.env.localbackend/.venv310/*.firebase.backup.*DEPLOYMENT.firebase.backup.md
+
+
+**/.env.local
+
+*.firebase.backup.**.backup.*DEPLOYMENT.firebase.backup.md
+
+# Migration backup files**/*firebase.backup***/DEPLOYMENT.firebase.backup.md
+
+# Exact migration backups
+backend/services/auth_service.firebase.backup.py
+backend/services/firebase_service.firebase.backup.py
+frontend/src/context/AuthContext.firebase.backup.jsx
+frontend/src/context/SessionContext.firebase.backup.jsx
+frontend/src/hooks/useNotifications.firebase.backup.js
+frontend/src/pages/Login.firebase.backup.jsx
+frontend/src/pages/Settings.firebase.backup.jsx
+frontend/src/utils/api.firebase.backup.js
+
+DEPLOYMENT.firebase.backup.md

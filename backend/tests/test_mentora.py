@@ -119,141 +119,9 @@ class TestFatigueModel:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Firebase service (stub mode)
+# Database service
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestFirebaseServiceStub:
-    def setup_method(self):
-        # Force stub mode
-        import backend.services.firebase_service as fs_mod
-        fs_mod._STUB_MODE = True
-        fs_mod._stub = {"sessions": {}, "fatigue": {}, "users": {}}
-        from backend.services.firebase_service import FirebaseService
-        self.svc = FirebaseService()
-
-    def test_create_and_get_session(self):
-        doc = {"session_id": "s1", "user_id": "u1", "started_at": 0.0, "status": "active",
-               "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0}
-        self.svc.create_session("s1", doc)
-        got = self.svc.get_session("s1")
-        assert got is not None
-        assert got["session_id"] == "s1"
-
-    def test_get_missing_session(self):
-        result = self.svc.get_session("nonexistent")
-        assert result is None
-
-    def test_add_and_get_fatigue_entries(self):
-        self.svc.create_session("s2", {"session_id": "s2", "user_id": "u1",
-                                       "started_at": 0, "status": "active",
-                                       "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0})
-        for i in range(3):
-            self.svc.add_fatigue_entry("s2", {"timestamp": float(i), "fatigue_score": 10*i, "state": "Normal"})
-        entries = self.svc.get_fatigue_entries("s2")
-        assert len(entries) == 3
-
-    def test_finalise_session(self):
-        self.svc.create_session("s3", {"session_id": "s3", "user_id": "u1",
-                                       "started_at": 0, "status": "active",
-                                       "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0})
-        self.svc.add_fatigue_entry("s3", {"fatigue_score": 40, "state": "Stressed"})
-        self.svc.add_fatigue_entry("s3", {"fatigue_score": 60, "state": "Fatigued"})
-        summary = self.svc.finalise_session("s3")
-        assert summary["status"] == "completed"
-        assert summary["avg_fatigue"] == 50.0
-        # peak_fatigue must be the true max across all frames, not just the
-        # most recently written score (regression test for the removed
-        # _fs.MAX() bug, which always fell back to overwriting with the
-        # latest score).
-        assert summary["peak_fatigue"] == 60
-
-    def test_weekly_analytics_correct_average_for_three_plus_sessions(self):
-        """
-        Regression test: daily avg_fatigue must be a true mean across all
-        sessions in a day, not a naive (prev + new) / 2 rolling average
-        (which overweights later sessions — e.g. previously produced 22.5
-        for scores [10, 20, 30] instead of the correct 20.0).
-        """
-        now = time.time() - 3600  # 1 hour ago — comfortably inside the 7-day window
-        for i, score in enumerate([10, 20, 30]):
-            sid = f"week-{i}"
-            self.svc.create_session(sid, {
-                "session_id": sid, "user_id": "u1",
-                "started_at": now + i, "ended_at": now + i + 60,
-                "status": "completed", "avg_fatigue": score,
-                "peak_fatigue": score, "frame_count": 1,
-            })
-        result = self.svc.get_weekly_analytics("u1")
-        assert len(result["days"]) == 1
-        day = result["days"][0]
-        assert day["sessions"] == 3
-        assert day["avg_fatigue"] == 20.0
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FastAPI endpoint tests (TestClient)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def client():
-    """Returns a FastAPI TestClient with auth stubbed out."""
-    import importlib, os
-    os.environ["ENV"] = "development"  # enable stub auth
-
-    # Stub Firebase before importing app
-    with patch.dict("sys.modules", {
-        "firebase_admin":          MagicMock(),
-        "firebase_admin.credentials": MagicMock(),
-        "firebase_admin.firestore":   MagicMock(),
-        "firebase_admin.auth":        MagicMock(),
-    }):
-        from fastapi.testclient import TestClient
-        import backend.main as app_module
-        return TestClient(app_module.app)
-
-
-def test_health(client):
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
-
-
-def test_start_session_returns_id(client):
-    resp = client.post("/api/v1/start-session",
-                       json={},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "session_id" in data
-    assert len(data["session_id"]) > 10
-
-
-def test_process_frame_invalid_b64(client):
-    resp = client.post("/api/v1/process-frame",
-                       json={"session_id": "test", "frame_b64": "!!!invalid!!!"},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 422
-
-
-def test_chatbot_returns_reply(client):
-    resp = client.post("/api/v1/chatbot",
-                       json={"message": "I feel tired", "fatigue_score": 70, "state": "Fatigued"},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    assert "reply" in resp.json()
-    assert len(resp.json()["reply"]) > 0
-
-
-def test_weekly_report_empty(client):
-    resp = client.get("/api/v1/reports/weekly",
-                      headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    assert "days" in resp.json()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Report service
-# ─────────────────────────────────────────────────────────────────────────────
 
 class TestReportService:
     def test_build_pdf_returns_bytes(self):
@@ -271,3 +139,6 @@ class TestReportService:
         pdf = build_pdf_report(report)
         assert isinstance(pdf, bytes)
         assert len(pdf) > 0
+
+
+

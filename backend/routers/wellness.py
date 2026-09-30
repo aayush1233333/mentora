@@ -28,3 +28,5 @@ async def get_tips_batch(
     user=Depends(get_current_user),
 ):
     return {"tips": _tips.get_batch(state=state, n=n)}  # type: ignore
+
+

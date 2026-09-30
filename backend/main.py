@@ -74,3 +74,4 @@ app.include_router(chatbot.router,          prefix="/api/v1", tags=["Chatbot"])
 app.include_router(user.router,             prefix="/api/v1", tags=["User"])
 app.include_router(wellness.router,         prefix="/api/v1", tags=["Wellness"])
 app.include_router(websocket_router.router,                   tags=["WebSocket"])
+

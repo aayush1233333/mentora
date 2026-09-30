@@ -9,12 +9,12 @@ import numpy as np
 import cv2
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from services.firebase_service import FirebaseService
+from services.supabase_service import SupabaseService
 from services.auth_service import get_current_user
 from services.detector_service import pool
 
 router   = APIRouter()
-firebase = FirebaseService()
+supabase_service = SupabaseService()
 
 # A typical webcam JPEG frame at modest resolution (e.g. 640x480, decent
 # quality) base64-encodes to well under 200 KB. We cap at 700 KB base64
@@ -64,7 +64,7 @@ async def process_frame(
 
     ts = body.timestamp or time.time()
 
-    # ── Persist to Firestore (non-blocking via background task ideally) ──────
+    # ── Persist fatigue data (non-blocking via background task ideally) ──────
     fatigue_doc = {
         "session_id":    body.session_id,
         "user_id":       user["uid"],
@@ -76,7 +76,10 @@ async def process_frame(
         "blink_count":   result["blink_count"],
         "yawn_count":    result["yawn_count"],
     }
-    firebase.add_fatigue_entry(body.session_id, fatigue_doc)
-    firebase.update_session_metrics(body.session_id, result["fatigue_score"])
+    supabase_service.add_fatigue_entry(body.session_id, fatigue_doc)
+    supabase_service.update_session_metrics(body.session_id, result["fatigue_score"])
 
     return ProcessFrameResponse(**result)
+
+
+

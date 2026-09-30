@@ -10,7 +10,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 - Python 3.11+
 - Node.js 20+
 - A webcam (for AI testing)
-- Firebase project (free Spark tier is fine)
+- Supabase project
 
 ### Quick start
 ```bash
@@ -27,7 +27,7 @@ start.bat    # Windows
 ```
 mentora/
 ├── ai_model/       Python: MediaPipe + EAR/MAR + CNN-LSTM
-├── backend/        FastAPI: REST + WebSocket + Firebase
+├── backend/        FastAPI: REST + WebSocket + Supabase
 └── frontend/       React 18 + Tailwind CSS
 ```
 
@@ -151,3 +151,4 @@ Please include:
 ## Code of Conduct
 
 Be respectful, constructive, and inclusive. Harassment of any kind will not be tolerated.
+

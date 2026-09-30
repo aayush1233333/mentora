@@ -136,3 +136,4 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         for key, value in self.HEADERS.items():
             response.headers[key] = value
         return response
+

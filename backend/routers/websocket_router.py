@@ -1,6 +1,6 @@
 """
 Mentora – WebSocket Router
-ws://host/ws/{session_id}?token=<firebase-id-token>  → real-time fatigue stream
+ws://host/ws/{session_id}?token=<supabase_service-id-token>  → real-time fatigue stream
 """
 
 import json
@@ -8,12 +8,12 @@ import asyncio
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from services.connection_manager import ConnectionManager
-from services.firebase_service import FirebaseService
+from services.supabase_service import SupabaseService
 from services.auth_service import verify_ws_token
 
 router   = APIRouter()
 manager  = ConnectionManager()
-firebase = FirebaseService()
+supabase_service = SupabaseService()
 logger   = logging.getLogger(__name__)
 
 # How long to wait for a client message before sending a server-side keepalive ping.
@@ -65,3 +65,5 @@ async def websocket_endpoint(
     except Exception as e:
         logger.error(f"WS error [{session_id}]: {e}")
         manager.disconnect(websocket, session_id)
+
+

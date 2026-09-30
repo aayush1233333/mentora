@@ -7,11 +7,11 @@ DELETE /sessions/{id}   → delete session and its sub-collection
 
 import time
 from fastapi import APIRouter, Depends, HTTPException, Query
-from services.firebase_service import FirebaseService
+from services.supabase_service import SupabaseService
 from services.auth_service import get_current_user
 
 router   = APIRouter()
-firebase = FirebaseService()
+supabase_service = SupabaseService()
 
 
 @router.get("/sessions")
@@ -21,7 +21,7 @@ async def list_sessions(
     user=Depends(get_current_user),
 ):
     """Returns sessions for the authenticated user, newest first."""
-    sessions = firebase.get_user_sessions(user["uid"], limit=limit, offset=offset)
+    sessions = supabase_service.get_user_sessions(user["uid"], limit=limit, offset=offset)
     return {
         "sessions": sessions,
         "count":    len(sessions),
@@ -32,7 +32,7 @@ async def list_sessions(
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str, user=Depends(get_current_user)):
-    session = firebase.get_session(session_id)
+    session = supabase_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session["user_id"] != user["uid"]:
@@ -42,10 +42,12 @@ async def get_session(session_id: str, user=Depends(get_current_user)):
 
 @router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str, user=Depends(get_current_user)):
-    session = firebase.get_session(session_id)
+    session = supabase_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session["user_id"] != user["uid"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    firebase.delete_session(session_id)
+    supabase_service.delete_session(session_id)
     return {"message": "Session deleted", "session_id": session_id}
+
+

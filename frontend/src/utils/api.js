@@ -1,5 +1,5 @@
 import axios from "axios";
-import { auth } from "./firebase";
+import { supabase } from "../supabaseClient";
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1",
@@ -7,16 +7,19 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const user = auth.currentUser;
-  if (user) {
-    const token = await user.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
+
   return config;
 });
 
 api.interceptors.response.use(
-  (r) => r,
+  (response) => response,
   async (err) => {
     const original = err.config;
 
@@ -24,21 +27,18 @@ api.interceptors.response.use(
     if (err.response?.status === 401 && !original?._retriedAfterRefresh) {
       original._retriedAfterRefresh = true;
 
-      // auth.currentUser can be momentarily null during the Firebase auth
-      // state initialization race (before onAuthStateChanged fires), even
-      // though the user is actually still logged in. Don't redirect to
-      // login on that basis alone — try a forced token refresh first.
-      if (auth.currentUser) {
-        try {
-          const freshToken = await auth.currentUser.getIdToken(true);
-          original.headers.Authorization = `Bearer ${freshToken}`;
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+
+        if (!error && data.session?.access_token) {
+          original.headers.Authorization = `Bearer ${data.session.access_token}`;
           return api.request(original);
-        } catch {
-          // Refresh itself failed — fall through to redirect below.
         }
+      } catch {
+        // Refresh failed - fall through to redirect below.
       }
 
-      // No user, or refresh failed: this is a genuine auth failure.
+      // Genuine authentication failure.
       window.location.href = "/login";
     }
 

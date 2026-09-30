@@ -1,64 +1,104 @@
 """
-Mentora – Auth Service
-Verifies Firebase ID tokens sent in the Authorization header (REST)
+Mentora - Auth Service
+Verifies Supabase JWTs sent in the Authorization header (REST)
 or as a ?token= query parameter (WebSocket).
 """
 
 import os
 import logging
 from fastapi import Header, HTTPException, status, WebSocket
+import jwt
+from jwt import PyJWKClient
 
 logger = logging.getLogger(__name__)
-_STUB_USER = {"uid": "dev-user-001", "email": "dev@mentora.ai"}
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_JWKS_URL = (
+    f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+    if SUPABASE_URL
+    else ""
+)
+
+_STUB_USER = {
+    "uid": "00000000-0000-0000-0000-000000000000",
+    "email": "dev@mentora.ai",
+}
+
+_jwks_client = (
+    PyJWKClient(SUPABASE_JWKS_URL)
+    if SUPABASE_JWKS_URL
+    else None
+)
 
 
 async def _verify_token(token: str) -> dict | None:
     """
-    Core token verification logic shared by REST and WebSocket paths.
-    Returns a user dict on success, or None if the token is invalid.
-    Falls back to the stub user in development when Firebase is unavailable.
+    Verify a Supabase access token using the project's public JWKS key.
     """
-    env = os.getenv("ENV", "development")
-    try:
-        import firebase_admin
-        from firebase_admin import auth as firebase_auth
 
-        if not firebase_admin._apps:
-            if env == "development":
-                logger.warning("Firebase Admin not initialized – returning stub user.")
-                return _STUB_USER
+    env = os.getenv("ENV", "development")
+
+    if not _jwks_client:
+        if env == "development":
+            logger.warning(
+                "Supabase JWKS is not configured - returning stub user."
+            )
+            return _STUB_USER
+        return None
+
+    try:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+
+        decoded = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256"],
+            options={
+                "verify_aud": False,
+            },
+        )
+
+        user_id = decoded.get("sub")
+
+        if not user_id:
             return None
 
-        decoded = firebase_auth.verify_id_token(token)
-        return {"uid": decoded["uid"], "email": decoded.get("email", "")}
-    except ImportError:
-        if env == "development":
-            logger.warning("firebase_admin not available – returning stub user.")
-            return _STUB_USER
-        return None
+        return {
+            "uid": user_id,
+            "email": decoded.get("email", ""),
+        }
+
     except Exception as e:
         if env == "development":
-            logger.warning(f"Token verification failed in dev – returning stub user. Error: {e}")
+            logger.warning(
+                f"Supabase token verification failed in dev: {e}"
+            )
             return _STUB_USER
+
         return None
 
 
-async def get_current_user(authorization: str = Header(default="")) -> dict:
+async def get_current_user(
+    authorization: str = Header(default="")
+) -> dict:
     """
-    Expects: Authorization: Bearer <firebase-id-token>
-    Falls back to a dev stub when Firebase is not configured.
+    Expects:
+        Authorization: Bearer <supabase-access-token>
     """
+
     env = os.getenv("ENV", "development")
 
     if not authorization.startswith("Bearer "):
         if env == "development":
             return _STUB_USER
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing Bearer token",
         )
 
     token = authorization.removeprefix("Bearer ").strip()
+
     user = await _verify_token(token)
 
     if user is None:
@@ -70,30 +110,39 @@ async def get_current_user(authorization: str = Header(default="")) -> dict:
     return user
 
 
-async def verify_ws_token(websocket: WebSocket, token: str = "") -> dict | None:
+async def verify_ws_token(
+    websocket: WebSocket,
+    token: str = ""
+) -> dict | None:
     """
-    WebSocket authentication via ?token=<firebase-id-token> query param.
-
-    Usage in a WebSocket endpoint:
-        async def ws_endpoint(websocket: WebSocket, token: str = Query(default="")):
-            user = await verify_ws_token(websocket, token)
-            if user is None:
-                return  # connection already closed with code 4001
-
-    Returns the user dict on success, or None after closing the socket with 4001.
+    WebSocket authentication via:
+        ?token=<supabase-access-token>
     """
+
     env = os.getenv("ENV", "development")
 
     if not token:
         if env == "development":
-            logger.warning("WS: no token provided – returning stub user in development.")
+            logger.warning(
+                "WS: no token provided - returning stub user in development."
+            )
             return _STUB_USER
-        await websocket.close(code=4001, reason="Missing authentication token")
+
+        await websocket.close(
+            code=4001,
+            reason="Missing authentication token",
+        )
         return None
 
     user = await _verify_token(token)
+
     if user is None:
-        await websocket.close(code=4001, reason="Invalid or expired token")
+        await websocket.close(
+            code=4001,
+            reason="Invalid or expired token",
+        )
         return None
 
     return user
+
+
