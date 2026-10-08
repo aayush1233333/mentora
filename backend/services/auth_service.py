@@ -25,7 +25,7 @@ _STUB_USER = {
 }
 
 _jwks_client = (
-    PyJWKClient(SUPABASE_JWKS_URL)
+    PyJWKClient(SUPABASE_JWKS_URL, timeout=5, cache_keys=True)
     if SUPABASE_JWKS_URL
     else None
 )
