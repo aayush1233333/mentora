@@ -18,7 +18,7 @@ export function useWellnessTip(state = "Normal", score = 0, debounceMs = 2000) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/wellness/tip?state=${encodeURIComponent(state)}&score=${score}`);
+      const res = await api.get(`/api/v1/wellness/tip?state=${encodeURIComponent(state)}&score=${score}`);
       setTip(res.data);
     } catch (e) {
       setError(e.message);
@@ -56,7 +56,7 @@ export function useWellnessTipsBatch(state = "Normal", n = 3) {
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/wellness/tips?state=${encodeURIComponent(state)}&n=${n}`);
+      const res = await api.get(`/api/v1/wellness/tips?state=${encodeURIComponent(state)}&n=${n}`);
       setTips(res.data?.tips || []);
     } catch {
       setTips([]);

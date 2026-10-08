@@ -45,7 +45,7 @@ export function SessionProvider({ children }) {
   const wsRef = useRef(null);
 
   const startSession = async () => {
-    const res = await api.post("/start-session", {});
+    const res = await api.post("/api/v1/start-session", {});
     const { session_id } = res.data;
     dispatch({ type: "START", payload: { sessionId: session_id } });
 

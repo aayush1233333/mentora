@@ -9,7 +9,7 @@ export default function WellnessTipCard({ state, score, dark }) {
   const fetchTip = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/wellness/tip?state=${state}&score=${score}`);
+      const res = await api.get(`/api/v1/wellness/tip?state=${state}&score=${score}`);
       setTip(res.data);
     } catch {
       setTip({

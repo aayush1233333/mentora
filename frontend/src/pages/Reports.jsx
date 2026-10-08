@@ -16,7 +16,7 @@ export default function Reports() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    api.get("/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
+    api.get("/api/v1/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
