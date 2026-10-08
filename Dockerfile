@@ -22,4 +22,4 @@ RUN mkdir -p /app/ai_model/weights && \
     curl -fsSL -o /app/ai_model/weights/face_landmarker.task \
     "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 
-CMD ["sh", "-c", "gunicorn backend.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0: --workers 1 --timeout 120"]
+CMD ["sh", "-c", "gunicorn backend.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000 --workers 1 --timeout 120"]
