@@ -12,7 +12,7 @@ from jwt import PyJWKClient
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_JWKS_URL = (
     f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
     if SUPABASE_URL
