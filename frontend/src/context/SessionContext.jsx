@@ -75,7 +75,7 @@ export function SessionProvider({ children }) {
 
   const sendFrame = async (b64, sessionId) => {
     try {
-      const res = await api.post("/process-frame", {
+      const res = await api.post("/api/v1/process-frame", {
         session_id: sessionId || state.sessionId,
         frame_b64:  b64,
         timestamp:  Date.now() / 1000,
@@ -87,7 +87,7 @@ export function SessionProvider({ children }) {
 
   const endSession = async () => {
     if (wsRef.current) wsRef.current.close();
-    if (state.sessionId) await api.post("/end-session", { session_id: state.sessionId });
+    if (state.sessionId) await api.post("/api/v1/end-session", { session_id: state.sessionId });
     dispatch({ type: "END" });
   };
 
