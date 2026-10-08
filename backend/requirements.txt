@@ -17,3 +17,6 @@ grpcio-status==1.62.3
 google-api-core==2.30.3
 
 supabase
+
+
+google-genai

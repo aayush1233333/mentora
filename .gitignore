@@ -59,3 +59,4 @@ frontend/src/pages/Settings.firebase.backup.jsx
 frontend/src/utils/api.firebase.backup.js
 
 DEPLOYMENT.firebase.backup.md
+backend/.venv310/

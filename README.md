@@ -104,7 +104,7 @@ cd backend
 # Copy and fill environment variables
 cp .env.example .env
 # Edit .env:
-#   OPENAI_API_KEY=sk-...   (optional – chatbot works without it)
+#   GEMINI_API_KEY=your-gemini-api-key   (optional – chatbot works without it)
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
@@ -292,7 +292,7 @@ model.train(X, y, epochs=30, batch_size=64)
 | Backend | FastAPI, Uvicorn, WebSockets |
 | Auth/DB | Supabase Auth, Supabase PostgreSQL |
 | Notifications | Push notifications (currently disabled) |
-| Chatbot | OpenAI GPT-4o-mini (+ rule-based fallback) |
+| Chatbot | Gemini 2.5 Flash (+ rule-based fallback) |
 | Frontend | React 18, Tailwind CSS, Recharts |
 | PDF | ReportLab |
 | DevOps | Docker, Docker Compose, nginx |

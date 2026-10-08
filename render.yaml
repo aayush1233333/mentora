@@ -14,6 +14,6 @@ services:
         value: /opt/render/project/src
       - key: CORS_ORIGINS
         value: https://mentora-repoo.vercel.app
-      - key: OPENAI_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
 

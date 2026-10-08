@@ -86,7 +86,7 @@ export default function ChatbotPage() {
     setLoading(true);
     try {
       const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-      const res = await api.post("/chatbot", { message: msg, fatigue_score: fatigueScore, state, history });
+      const res = await api.post("/api/v1/chatbot", { message: msg, fatigue_score: fatigueScore, state, history });
       const reply = res.data.reply;
       setMessages(prev => [...prev, { role: "assistant", content: reply, ts: Date.now() }]);
       if (ttsEnabled) speakText(reply);
@@ -158,3 +158,4 @@ export default function ChatbotPage() {
     </div>
   );
 }
+
