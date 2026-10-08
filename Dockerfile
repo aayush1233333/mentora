@@ -7,6 +7,7 @@ ENV PYTHONPATH=/app/backend
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgles2 \
     libegl1 \
+    libgl1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,3 +26,4 @@ RUN mkdir -p /app/ai_model/weights && \
 
 CMD ["sh", "-c", "gunicorn backend.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000 --workers 1 --timeout 120"]
 CMD ["sh", "-c", "cd /app/backend && gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000 --workers 1 --timeout 120"]
+
