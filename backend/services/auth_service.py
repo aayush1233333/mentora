@@ -69,10 +69,9 @@ async def _verify_token(token: str) -> dict | None:
         }
 
     except Exception as e:
+        logger.exception("Supabase token verification failed: %s", e)
+
         if env == "development":
-            logger.warning(
-                f"Supabase token verification failed in dev: {e}"
-            )
             return _STUB_USER
 
         return None
