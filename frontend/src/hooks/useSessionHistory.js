@@ -14,7 +14,7 @@ export function useSessionHistory(limit = 20) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get(`/sessions?limit=${limit}`);
+      const res = await api.get(`/api/v1/sessions?limit=${limit}`);
       setSessions(res.data?.sessions || []);
     } catch (e) {
       setError(e.message || "Failed to load sessions");
@@ -26,7 +26,7 @@ export function useSessionHistory(limit = 20) {
   useEffect(() => { fetch(); }, [fetch]);
 
   const deleteSession = useCallback(async (sessionId) => {
-    await api.delete(`/sessions/${sessionId}`);
+    await api.delete(`/api/v1/sessions/${sessionId}`);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
   }, []);
 
