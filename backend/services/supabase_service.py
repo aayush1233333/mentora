@@ -41,6 +41,8 @@ class SupabaseService:
             .execute()
         )
 
+        if result is None:
+            return None
         return result.data
 
     def update_session_metrics(self, session_id: str, new_score: float):
@@ -79,6 +81,7 @@ class SupabaseService:
         update = {
             "ended_at": time.time(),
             "status": "completed",
+            "frame_count": len(entries),
             "avg_fatigue": round(
                 sum(scores) / len(scores), 1
             ) if scores else 0,

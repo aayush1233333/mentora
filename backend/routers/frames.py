@@ -77,7 +77,7 @@ async def process_frame(
         "yawn_count":    result["yawn_count"],
     }
     supabase_service.add_fatigue_entry(body.session_id, fatigue_doc)
-    supabase_service.update_session_metrics(body.session_id, result["fatigue_score"])
+
 
     return ProcessFrameResponse(**result)
 

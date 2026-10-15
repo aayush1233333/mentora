@@ -1,9 +1,9 @@
 services:
   - type: web
-    runtime: python
     name: mentora-backend
-    buildCommand: apt-get update && apt-get install -y --no-install-recommends libgles2 libegl1 && rm -rf /var/lib/apt/lists/* && pip install -r backend/requirements.txt
-    startCommand: gunicorn -c backend/gunicorn.conf.py backend.main:app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: ENV
@@ -11,9 +11,8 @@ services:
       - key: WEB_CONCURRENCY
         value: 1
       - key: PYTHONPATH
-        value: /opt/render/project/src
+        value: /app:/app/backend
       - key: CORS_ORIGINS
         value: https://mentora-repoo.vercel.app
       - key: GEMINI_API_KEY
         sync: false
-

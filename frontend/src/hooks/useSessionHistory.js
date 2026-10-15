@@ -15,7 +15,13 @@ export function useSessionHistory(limit = 20) {
     setError(null);
     try {
       const res = await api.get(`/api/v1/sessions?limit=${limit}`);
-      setSessions(res.data?.sessions || []);
+      const rows = res.data?.sessions || [];
+      setSessions(
+        rows.map((s) => ({
+          ...s,
+          session_id: s.session_id ?? s.id,
+        }))
+      );
     } catch (e) {
       setError(e.message || "Failed to load sessions");
     } finally {
