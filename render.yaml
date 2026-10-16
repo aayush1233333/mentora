@@ -1,24 +1,18 @@
 services:
   - type: web
-    runtime: python
     name: mentora-backend
-    buildCommand: pip install -r backend/requirements.txt && mkdir -p ai_model/weights && curl -fsSL -o ai_model/weights/face_landmarker.task "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
-    startCommand: gunicorn -c backend/gunicorn.conf.py backend.main:app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
-    packages:
-      - libgles2
-      - libegl1
-      - libgl1
     envVars:
       - key: ENV
         value: production
       - key: WEB_CONCURRENCY
         value: 1
       - key: PYTHONPATH
-        value: /opt/render/project/src
+        value: /app:/app/backend
       - key: CORS_ORIGINS
         value: https://mentora-repoo.vercel.app
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
-        sync: false
-      - key: OPENAI_API_KEY
+      - key: GEMINI_API_KEY
         sync: false

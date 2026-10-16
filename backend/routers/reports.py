@@ -8,12 +8,12 @@ from fastapi.responses import StreamingResponse
 import io
 import time
 
-from services.firebase_service import FirebaseService
+from services.supabase_service import SupabaseService
 from services.auth_service import get_current_user
 from services.report_service import build_pdf_report
 
 router   = APIRouter()
-firebase = FirebaseService()
+supabase_service = SupabaseService()
 
 
 @router.get("/report")
@@ -22,13 +22,13 @@ async def get_report(
     format:     str = Query("json", regex="^(json|pdf)$"),
     user=Depends(get_current_user),
 ):
-    session = firebase.get_session(session_id)
+    session = supabase_service.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session["user_id"] != user["uid"]:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    entries = firebase.get_fatigue_entries(session_id)
+    entries = supabase_service.get_fatigue_entries(session_id)
 
     report = _build_report(session, entries)
 
@@ -51,7 +51,7 @@ async def weekly_analytics(user=Depends(get_current_user)):
     cached = cache_get(cache_key)
     if cached:
         return cached
-    data = firebase.get_weekly_analytics(user["uid"])
+    data = supabase_service.get_weekly_analytics(user["uid"])
     cache_set(cache_key, data, ttl=300)
     return data
 
@@ -85,3 +85,5 @@ def _build_report(session: dict, entries: list) -> dict:
     ]
 
     return {"session": session, "analytics": analytics, "timeline": timeline}
+
+

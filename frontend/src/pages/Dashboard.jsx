@@ -35,7 +35,7 @@ export default function Dashboard() {
   const [showBreathing, setShowBreathing] = useState(false);
 
   useEffect(() => {
-    api.get("/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
+    api.get("/api/v1/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
   }, []);
 
   // Auto-suggest breathing when stressed/fatigued.

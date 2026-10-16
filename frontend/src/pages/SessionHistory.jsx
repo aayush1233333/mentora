@@ -76,7 +76,7 @@ export default function SessionHistory() {
 
   const handleExport = async (sessionId) => {
     try {
-      const res = await api.get(`/report?session_id=${sessionId}&format=pdf`, { responseType: "blob" });
+      const res = await api.get(`/api/v1/report?session_id=${sessionId}&format=pdf`, { responseType: "blob" });
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;

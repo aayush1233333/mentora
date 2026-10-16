@@ -138,15 +138,26 @@ export function CameraProvider({ children }) {
   }, []);
 
   const startCapture = useCallback((onFrame, fps = 2) => {
-    captureHandlerRef.current = onFrame;
-    clearInterval(timerRef.current);
+  captureHandlerRef.current = onFrame;
+  clearInterval(timerRef.current);
 
-    timerRef.current = setInterval(async () => {
-      const b64 = captureFrame();
-      if (!b64 || !captureHandlerRef.current) return;
+  let processing = false;
+
+  timerRef.current = setInterval(async () => {
+    if (processing) return;
+
+    const b64 = captureFrame();
+    if (!b64 || !captureHandlerRef.current) return;
+
+    processing = true;
+
+    try {
       await captureHandlerRef.current(b64);
-    }, Math.round(1000 / fps));
-  }, [captureFrame]);
+    } finally {
+      processing = false;
+    }
+  }, Math.round(1000 / fps));
+}, [captureFrame]);
 
   useEffect(() => () => { stop(); }, [stop]);
 
@@ -156,3 +167,4 @@ export function CameraProvider({ children }) {
     </CameraContext.Provider>
   );
 }
+

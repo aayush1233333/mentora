@@ -115,3 +115,4 @@ def build_pdf_report(report: dict) -> bytes:
     except ImportError:
         logger.warning("ReportLab not installed – returning stub PDF bytes.")
         return b"%PDF-1.4 stub"
+

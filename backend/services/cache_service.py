@@ -1,6 +1,6 @@
 """
 Mentora – Simple TTL Cache
-Avoids hammering Firestore on every request for data that changes slowly
+Avoids hammering the database on every request for data that changes slowly
 (e.g. weekly analytics, user preferences).
 
 Backed by a dict with per-key expiry.  Thread-safe for Uvicorn workers
@@ -117,3 +117,5 @@ def cache_bust(prefix: str) -> int:
 
 def cache_stats() -> dict:
     return _cache.stats
+
+

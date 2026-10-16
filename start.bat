@@ -14,14 +14,14 @@ where npm    >nul 2>nul || (echo npm not found. & pause & exit /b 1)
 if not exist "backend\.env" (
     echo Copying backend .env.example...
     copy "backend\.env.example" "backend\.env"
-    echo Edit backend\.env with your Firebase + OpenAI credentials.
+    echo Edit backend\.env with your Supabase + OpenAI credentials.
 )
 
 :: Frontend env
 if not exist "frontend\.env" (
     echo Copying frontend .env.example...
     copy "frontend\.env.example" "frontend\.env"
-    echo Edit frontend\.env with your Firebase web config.
+    echo Edit frontend\.env with your Supabase web configuration.
 )
 
 :: Backend
@@ -50,3 +50,4 @@ echo ====================================================
 echo.
 npm start
 cd ..
+

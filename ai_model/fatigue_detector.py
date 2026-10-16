@@ -18,6 +18,7 @@ the per-landmark x/y/z coordinates.
 """
 
 from collections import deque
+import importlib
 import logging
 import os
 import time
@@ -25,11 +26,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 import cv2
-import mediapipe as mp
-from mediapipe.tasks import python as mp_tasks_python
-from mediapipe.tasks.python import vision as mp_tasks_vision
 import numpy as np
-from scipy.spatial import distance as dist
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +70,16 @@ class FatigueDetector:
     """
 
     def __init__(self):
+        try:
+            mp = importlib.import_module("mediapipe")
+            mp_tasks_python = importlib.import_module("mediapipe.tasks.python")
+            mp_tasks_vision = importlib.import_module("mediapipe.tasks.python.vision")
+        except ImportError as exc:
+            raise RuntimeError(
+                "MediaPipe is required for fatigue detection. Install the "
+                "mediapipe package in the active Python environment."
+            ) from exc
+
         if not MODEL_PATH.exists():
             raise FileNotFoundError(
                 f"FaceLandmarker model not found at {MODEL_PATH}. "
@@ -96,6 +103,7 @@ class FatigueDetector:
             output_facial_transformation_matrixes=False,
         )
         self.face_landmarker = mp_tasks_vision.FaceLandmarker.create_from_options(options)
+        self._mp = mp
 
         self.ear_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
         self.mar_buffer: deque = deque(maxlen=FATIGUE_WINDOW)
@@ -132,21 +140,21 @@ class FatigueDetector:
     @staticmethod
     def _eye_aspect_ratio(landmarks, eye_indices, w, h) -> float:
         pts = [(int(landmarks[i].x * w), int(landmarks[i].y * h)) for i in eye_indices]
-        a = dist.euclidean(pts[1], pts[5])
-        b = dist.euclidean(pts[2], pts[4])
-        c = dist.euclidean(pts[0], pts[3])
+        a = float(np.linalg.norm(np.asarray(pts[1]) - pts[5]))
+        b = float(np.linalg.norm(np.asarray(pts[2]) - pts[4]))
+        c = float(np.linalg.norm(np.asarray(pts[0]) - pts[3]))
         return (a + b) / (2.0 * c + 1e-6)
 
     @staticmethod
     def _mouth_aspect_ratio(landmarks, mouth_indices, w, h) -> float:
         pts = [(int(landmarks[i].x * w), int(landmarks[i].y * h)) for i in mouth_indices]
-        a = dist.euclidean(pts[2], pts[4])
-        b = dist.euclidean(pts[3], pts[5])
-        c = dist.euclidean(pts[0], pts[1])
+        a = float(np.linalg.norm(np.asarray(pts[2]) - pts[4]))
+        b = float(np.linalg.norm(np.asarray(pts[3]) - pts[5]))
+        c = float(np.linalg.norm(np.asarray(pts[0]) - pts[1]))
         return (a + b) / (2.0 * c + 1e-6)
 
     def _compute_fatigue_score(self, ear: float, mar: float) -> float:
-        if len(self.ear_buffer) < 10:
+        if len(self.ear_buffer) < 5:
             return 0.0
 
         avg_ear = np.mean(self.ear_buffer)
@@ -168,7 +176,7 @@ class FatigueDetector:
     def _classify_state(self, score: float, mar: float, ear: float) -> str:
         if score >= 65 or ear < EAR_THRESHOLD * 0.85:
             return "Fatigued"
-        if score >= 35 or mar > MAR_THRESHOLD:
+        if score >= 35:
             return "Stressed"
         return "Normal"
 
@@ -191,20 +199,26 @@ class FatigueDetector:
                 self.yawn_counter = 0
             return
 
-        if mar >= YAWN_OPEN_THRESHOLD:
-            if self._yawn_started_at is None:
+        if self._yawn_started_at is None:
+            if mar >= YAWN_OPEN_THRESHOLD:
                 self._yawn_started_at = now
                 self.yawn_counter = 1
-                return
-
-            self.yawn_counter += 1
-            if now - self._yawn_started_at >= YAWN_MIN_DURATION:
-                self.yawn_total += 1
-                self._yawn_active = True
+            else:
+                self.yawn_counter = 0
             return
 
-        self._yawn_started_at = None
-        self.yawn_counter = 0
+        # Keep the pending yawn timer while MAR stays above
+        # the closing threshold, even if MAR fluctuates below
+        # the opening threshold.
+        if mar <= YAWN_CLOSE_THRESHOLD:
+            self._yawn_started_at = None
+            self.yawn_counter = 0
+            return
+
+        self.yawn_counter += 1
+        if now - self._yawn_started_at >= YAWN_MIN_DURATION:
+            self.yawn_total += 1
+            self._yawn_active = True
 
     def process_frame(self, frame_bgr: np.ndarray) -> Dict:
         """
@@ -220,7 +234,7 @@ class FatigueDetector:
         # FaceLandmarker (mp.tasks) requires the input wrapped in an
         # mp.Image, unlike the legacy FaceMesh.process() which accepted a
         # raw numpy array directly.
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        mp_image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
         result = self.face_landmarker.detect(mp_image)
 
         if not result.face_landmarks:

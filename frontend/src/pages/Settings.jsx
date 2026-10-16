@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Save, User, Bell, Shield, Sliders, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { db } from "../utils/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { supabase } from "../supabaseClient";
+
 
 const FATIGUE_THRESHOLDS = [
   { label: "Sensitive",   stressed: 25, fatigued: 50 },
@@ -71,29 +71,74 @@ export default function Settings() {
     pomodoroMinutes:    25,
     showEARMAR:         true,
   });
-
-  // Load from Firestore
+  // Load from Supabase
   useEffect(() => {
-    if (!user) return;
-    getDoc(doc(db, "users", user.uid))
-      .then(snap => {
-        if (snap.exists()) setPrefs(p => ({ ...p, ...snap.data().preferences }));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const loadPreferences = async () => {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("email, display_name, preferences")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error loading settings:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        setPrefs(p => ({
+          ...p,
+          displayName: data.display_name || "",
+          ...(data.preferences || {}),
+        }));
+      }
+
+      setLoading(false);
+    };
+
+    loadPreferences();
   }, [user]);
 
   const set = (key, value) => setPrefs(p => ({ ...p, [key]: value }));
 
   const save = async () => {
     if (!user) return;
-    await setDoc(doc(db, "users", user.uid), {
-      email:       user.email,
-      preferences: prefs,
-      updatedAt:   new Date().toISOString(),
-    }, { merge: true });
+
+    setSaved(false);
+
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: user.id,
+          email: user.email,
+          display_name: prefs.displayName,
+          preferences: prefs,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "id",
+        }
+      );
+
+    if (error) {
+      console.error("Error saving settings:", error);
+      return;
+    }
+
     setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+
+    setTimeout(() => {
+      setSaved(false);
+    }, 2500);
   };
 
   if (loading) return <div className="p-6 text-gray-400 text-sm">Loading preferences…</div>;
@@ -220,9 +265,12 @@ export default function Settings() {
         <Shield size={14} className="text-emerald-500 shrink-0 mt-0.5" />
         <span>
           Mentora processes all video locally in your browser. No camera footage is transmitted or stored.
-          Only numeric metrics (fatigue score, EAR, MAR) are sent to the server and saved in your private Firestore documents.
+          Only numeric metrics (fatigue score, EAR, MAR) are sent to the server and saved in your private account data.
         </span>
       </div>
     </div>
   );
 }
+
+
+

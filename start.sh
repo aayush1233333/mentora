@@ -49,13 +49,13 @@ fi
 if [ ! -f "backend/.env" ]; then
   echo -e "\n${YELLOW}⚠  backend/.env not found – copying from example…${NC}"
   cp backend/.env.example backend/.env
-  echo -e "${YELLOW}   Edit backend/.env and add your Firebase + OpenAI credentials.${NC}"
+  echo -e "${YELLOW}   Edit backend/.env and add your Supabase + OpenAI credentials.${NC}"
 fi
 
 if [ ! -f "frontend/.env" ]; then
   echo -e "${YELLOW}⚠  frontend/.env not found – copying from example…${NC}"
   cp frontend/.env.example frontend/.env
-  echo -e "${YELLOW}   Edit frontend/.env and add your Firebase web config.${NC}"
+  echo -e "${YELLOW}   Edit frontend/.env and add your Supabase web configuration.${NC}"
 fi
 
 # ── Backend setup ─────────────────────────────────────────────────────────────
@@ -102,3 +102,4 @@ echo -e "Press ${YELLOW}Ctrl+C${NC} to stop both servers.\n"
 trap "echo -e '\n${YELLOW}Stopping servers…${NC}'; kill $BACKEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
 
 npm start
+

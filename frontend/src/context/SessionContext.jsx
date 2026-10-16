@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useRef } from "react";
 import api from "../utils/api";
-import { auth } from "../utils/firebase";
+import { supabase } from "../supabaseClient";
 
 const SessionContext = createContext(null);
 export const useSession = () => useContext(SessionContext);
@@ -45,19 +45,17 @@ export function SessionProvider({ children }) {
   const wsRef = useRef(null);
 
   const startSession = async () => {
-    const res = await api.post("/start-session", {});
+    const res = await api.post("/api/v1/start-session", {});
     const { session_id } = res.data;
     dispatch({ type: "START", payload: { sessionId: session_id } });
 
-    // ── Open WebSocket with Firebase ID token for authentication ─────────────
-    // The backend expects: ws://host/ws/{session_id}?token=<firebase-id-token>
+    // ── Open WebSocket with Supabase access token for authentication ─────────────
+    // The backend expects: ws://host/ws/{session_id}?token=<supabase-access-token>
     // We fetch a fresh token here so it isn't stale by the time the server
     // verifies it. Falls back to an empty string in dev (stub auth active).
     let token = "";
     try {
-      if (auth.currentUser) {
-        token = await auth.currentUser.getIdToken();
-      }
+      const { data: { session } } = await supabase.auth.getSession(); if (session) { token = session.access_token; }
     } catch (e) {
       console.warn("Could not fetch ID token for WebSocket auth:", e);
     }
@@ -77,7 +75,7 @@ export function SessionProvider({ children }) {
 
   const sendFrame = async (b64, sessionId) => {
     try {
-      const res = await api.post("/process-frame", {
+      const res = await api.post("/api/v1/process-frame", {
         session_id: sessionId || state.sessionId,
         frame_b64:  b64,
         timestamp:  Date.now() / 1000,
@@ -89,7 +87,7 @@ export function SessionProvider({ children }) {
 
   const endSession = async () => {
     if (wsRef.current) wsRef.current.close();
-    if (state.sessionId) await api.post("/end-session", { session_id: state.sessionId });
+    if (state.sessionId) await api.post("/api/v1/end-session", { session_id: state.sessionId });
     dispatch({ type: "END" });
   };
 
@@ -99,3 +97,5 @@ export function SessionProvider({ children }) {
     </SessionContext.Provider>
   );
 }
+
+

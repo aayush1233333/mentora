@@ -3,6 +3,7 @@ Mentora – FastAPI Application Entry Point
 """
 import os
 import logging
+import re
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -22,6 +23,37 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
 )
+class _SensitiveQueryFilter(logging.Filter):
+    _pattern = re.compile(
+        r"([?&](?:access_token|refresh_token|token)=)[^&\s\"']+",
+        re.IGNORECASE,
+    )
+
+    def _redact(self, value):
+        if isinstance(value, str):
+            return self._pattern.sub(r"\1[REDACTED]", value)
+        if isinstance(value, tuple):
+            return tuple(self._redact(item) for item in value)
+        if isinstance(value, list):
+            return [self._redact(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                key: self._redact(item)
+                for key, item in value.items()
+            }
+        return value
+
+    def filter(self, record):
+        record.msg = self._redact(record.msg)
+        record.args = self._redact(record.args)
+        return True
+
+
+for _access_logger_name in ("uvicorn.access", "uvicorn.error", "gunicorn.access"):
+    logging.getLogger(_access_logger_name).addFilter(
+        _SensitiveQueryFilter()
+    )
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,3 +106,4 @@ app.include_router(chatbot.router,          prefix="/api/v1", tags=["Chatbot"])
 app.include_router(user.router,             prefix="/api/v1", tags=["User"])
 app.include_router(wellness.router,         prefix="/api/v1", tags=["Wellness"])
 app.include_router(websocket_router.router,                   tags=["WebSocket"])
+

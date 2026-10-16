@@ -16,18 +16,18 @@ export default function Reports() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    api.get("/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
+    api.get("/api/v1/reports/weekly").then(r => setWeekly(r.data?.days || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!selected) { setDetail(null); return; }
-    api.get(`/report?session_id=${selected}&format=json`).then(r => setDetail(r.data)).catch(() => {});
+    api.get(`/api/v1/report?session_id=${selected}&format=json`).then(r => setDetail(r.data)).catch(() => {});
   }, [selected]);
 
   const exportPDF = async (id) => {
     setExporting(true);
     try {
-      const res = await api.get(`/report?session_id=${id}&format=pdf`, { responseType: "blob" });
+      const res = await api.get(`/api/v1/report?session_id=${id}&format=pdf`, { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       Object.assign(document.createElement("a"), { href: url, download: `mentora_${id.slice(0,8)}.pdf` }).click();
       URL.revokeObjectURL(url);

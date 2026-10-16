@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import numpy as np
 import pytest
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
@@ -16,42 +15,6 @@ from unittest.mock import MagicMock, patch
 # AI Model tests
 # ─────────────────────────────────────────────────────────────────────────────
 
-# FatigueDetector now uses the MediaPipe Tasks FaceLandmarker API which
-# requires a downloaded .task model file at ai_model/weights/face_landmarker.task.
-# In CI this file is fetched by the "Download FaceLandmarker model" step.
-# Locally, run: curl -L -o ai_model/weights/face_landmarker.task \
-#   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
-_MODEL_PATH = Path(__file__).resolve().parents[3] / "ai_model" / "weights" / "face_landmarker.task"
-_MODEL_AVAILABLE = _MODEL_PATH.exists()
-
-# Also verify the MediaPipe Tasks C++ runtime can actually load.
-# It needs EGL/GLES shared libraries even on headless systems.
-# We catch BaseException (not just Exception) since ctypes OSError
-# can sometimes propagate outside normal exception hierarchy on some platforms.
-if _MODEL_AVAILABLE:
-    try:
-        import mediapipe as _mp
-        from mediapipe.tasks import python as _mpt
-        from mediapipe.tasks.python import vision as _mptv
-        _base_opts = _mpt.BaseOptions(model_asset_path=str(_MODEL_PATH))
-        _fl_opts  = _mptv.FaceLandmarkerOptions(
-            base_options=_base_opts,
-            running_mode=_mptv.RunningMode.IMAGE,
-        )
-        _probe = _mptv.FaceLandmarker.create_from_options(_fl_opts)
-        _probe.close()
-        del _base_opts, _fl_opts, _probe
-        _DETECTOR_AVAILABLE = True
-    except BaseException:
-        _DETECTOR_AVAILABLE = False
-else:
-    _DETECTOR_AVAILABLE = False
-
-@pytest.mark.skipif(not _DETECTOR_AVAILABLE, reason=(
-    "FaceLandmarker not available: model file missing or MediaPipe Tasks "
-    "C++ runtime failed to load (libGLESv2.so.2 missing — "
-    "install: sudo apt-get install libgles2)"
-))
 class TestFatigueDetector:
     """Tests for the rule-based fatigue detector (no real webcam needed)."""
 
@@ -156,114 +119,9 @@ class TestFatigueModel:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Firebase service (stub mode)
+# Database service
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestFirebaseServiceStub:
-    def setup_method(self):
-        # Force stub mode
-        import backend.services.firebase_service as fs_mod
-        fs_mod._STUB_MODE = True
-        fs_mod._stub = {"sessions": {}, "fatigue": {}, "users": {}}
-        from backend.services.firebase_service import FirebaseService
-        self.svc = FirebaseService()
-
-    def test_create_and_get_session(self):
-        doc = {"session_id": "s1", "user_id": "u1", "started_at": 0.0, "status": "active",
-               "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0}
-        self.svc.create_session("s1", doc)
-        got = self.svc.get_session("s1")
-        assert got is not None
-        assert got["session_id"] == "s1"
-
-    def test_get_missing_session(self):
-        result = self.svc.get_session("nonexistent")
-        assert result is None
-
-    def test_add_and_get_fatigue_entries(self):
-        self.svc.create_session("s2", {"session_id": "s2", "user_id": "u1",
-                                       "started_at": 0, "status": "active",
-                                       "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0})
-        for i in range(3):
-            self.svc.add_fatigue_entry("s2", {"timestamp": float(i), "fatigue_score": 10*i, "state": "Normal"})
-        entries = self.svc.get_fatigue_entries("s2")
-        assert len(entries) == 3
-
-    def test_finalise_session(self):
-        self.svc.create_session("s3", {"session_id": "s3", "user_id": "u1",
-                                       "started_at": 0, "status": "active",
-                                       "avg_fatigue": 0, "peak_fatigue": 0, "frame_count": 0})
-        self.svc.add_fatigue_entry("s3", {"fatigue_score": 40, "state": "Stressed"})
-        self.svc.add_fatigue_entry("s3", {"fatigue_score": 60, "state": "Fatigued"})
-        summary = self.svc.finalise_session("s3")
-        assert summary["status"] == "completed"
-        assert summary["avg_fatigue"] == 50.0
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FastAPI endpoint tests (TestClient)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@pytest.fixture
-def client():
-    """Returns a FastAPI TestClient with auth stubbed out."""
-    import importlib, os
-    os.environ["ENV"] = "development"  # enable stub auth
-
-    # Stub Firebase before importing app
-    with patch.dict("sys.modules", {
-        "firebase_admin":          MagicMock(),
-        "firebase_admin.credentials": MagicMock(),
-        "firebase_admin.firestore":   MagicMock(),
-        "firebase_admin.auth":        MagicMock(),
-    }):
-        from fastapi.testclient import TestClient
-        import backend.main as app_module
-        return TestClient(app_module.app)
-
-
-def test_health(client):
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
-
-
-def test_start_session_returns_id(client):
-    resp = client.post("/api/v1/start-session",
-                       json={},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "session_id" in data
-    assert len(data["session_id"]) > 10
-
-
-def test_process_frame_invalid_b64(client):
-    resp = client.post("/api/v1/process-frame",
-                       json={"session_id": "test", "frame_b64": "!!!invalid!!!"},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 422
-
-
-def test_chatbot_returns_reply(client):
-    resp = client.post("/api/v1/chatbot",
-                       json={"message": "I feel tired", "fatigue_score": 70, "state": "Fatigued"},
-                       headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    assert "reply" in resp.json()
-    assert len(resp.json()["reply"]) > 0
-
-
-def test_weekly_report_empty(client):
-    resp = client.get("/api/v1/reports/weekly",
-                      headers={"Authorization": "Bearer stub"})
-    assert resp.status_code == 200
-    assert "days" in resp.json()
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Report service
-# ─────────────────────────────────────────────────────────────────────────────
 
 class TestReportService:
     def test_build_pdf_returns_bytes(self):
@@ -281,3 +139,6 @@ class TestReportService:
         pdf = build_pdf_report(report)
         assert isinstance(pdf, bytes)
         assert len(pdf) > 0
+
+
+

@@ -1,7 +1,7 @@
 # Mentora API – Complete Reference v1.0
 
 Base URL: `http://localhost:8000/api/v1`
-Auth header (all endpoints): `Authorization: Bearer <firebase-id-token>`
+Auth header (all endpoints): `Authorization: Bearer <supabase-access-token>`
 Swagger UI: `http://localhost:8000/docs`
 
 ---
@@ -50,3 +50,4 @@ ws://localhost:8000/ws/{session_id}
 /chatbot:        5 req/s burst, 1 req/s sustained
 
 ## Error codes: 401 Unauthorized, 403 Forbidden, 404 Not Found, 422 Invalid, 429 Rate Limited, 500 Server Error
+

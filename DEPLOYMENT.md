@@ -1,200 +1,182 @@
-# Mentora – Cloud Deployment Guide
+# Mentora � Deployment Guide
 
-## Option A: Google Cloud Run + Firebase Hosting (Recommended)
+## Current Architecture
 
-### Prerequisites
-- Google Cloud project with billing enabled
-- `gcloud` CLI installed and authenticated
-- Firebase project linked to the GCP project
+- Frontend: Vercel
+- Backend: Render
+- Authentication: Supabase Auth
+- Database: Supabase PostgreSQL
+- AI/ML: TensorFlow + MediaPipe + OpenCV
+- API: FastAPI
+- WebSocket: FastAPI WebSocket
+- Optional chatbot: OpenAI API
 
 ---
 
-### 1. Build & push Docker images
+## 1. Backend Deployment � Render
 
-```bash
-# Authenticate Docker with GCP
-gcloud auth configure-docker us-central1-docker.pkg.dev
+Backend directory:
 
-# Create Artifact Registry repository
-gcloud artifacts repositories create mentora \
-  --repository-format=docker \
-  --location=us-central1
+``text
+backend/
+`` 
 
-# Build and push backend
-docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT/mentora/backend:latest ./backend
-docker push    us-central1-docker.pkg.dev/YOUR_PROJECT/mentora/backend:latest
-```
+### Build Command
 
-### 2. Store secrets in Secret Manager
+``bash
+pip install -r requirements.txt
+`` 
 
-```bash
-# Firebase service account
-gcloud secrets create mentora-firebase-sa --data-file=./backend/firebase-service-account.json
+### Start Command
 
-# OpenAI key
-echo -n "sk-..." | gcloud secrets create mentora-openai-key --data-file=-
-```
+``bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+`` 
 
-### 3. Deploy backend to Cloud Run
+### Required Backend Environment Variables
 
-```bash
-gcloud run deploy mentora-backend \
-  --image us-central1-docker.pkg.dev/YOUR_PROJECT/mentora/backend:latest \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --port 8000 \
-  --memory 1Gi \
-  --cpu 1 \
-  --min-instances 0 \
-  --max-instances 10 \
-  --set-env-vars ENV=production,CORS_ORIGINS=https://YOUR_DOMAIN.web.app \
-  --set-secrets GOOGLE_APPLICATION_CREDENTIALS=mentora-firebase-sa:latest,OPENAI_API_KEY=mentora-openai-key:latest
-```
+``text
+ENV=production
+SUPABASE_URL=<your-supabase-project-url>
+SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
+CORS_ORIGINS=https://mentora-repoo.vercel.app
+OPENAI_API_KEY=<optional>
+`` 
 
-Note the deployed URL (e.g. `https://mentora-backend-xyz-uc.a.run.app`)
+Do not commit .env or any service-role key to Git.
 
-### 4. Deploy frontend to Firebase Hosting
+---
 
-```bash
-cd frontend
+## 2. Frontend Deployment � Vercel
 
-# Update .env with Cloud Run URL
-echo "REACT_APP_API_URL=https://mentora-backend-xyz-uc.a.run.app/api/v1" >> .env.production
-echo "REACT_APP_WS_URL=wss://mentora-backend-xyz-uc.a.run.app" >> .env.production
+Frontend directory:
 
+frontend/
+
+### Build Command
+
+``bash
+npm install
 npm run build
+`` 
 
-# Deploy
-npm install -g firebase-tools
-firebase login
-firebase deploy --only hosting
-```
+### Required Frontend Environment Variables
 
----
+``text
+REACT_APP_SUPABASE_URL=<your-supabase-project-url>
+REACT_APP_SUPABASE_PUBLISHABLE_KEY=<your-supabase-publishable-key>
+REACT_APP_API_URL=<your-render-backend-url>/api/v1
+REACT_APP_WS_URL=<your-render-backend-url>
+`` 
 
-## Option B: Railway (Easiest – Free tier available)
-
-### Backend
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-railway login
-
-# Deploy backend
-cd backend
-railway init
-railway up
-
-# Set environment variables in Railway dashboard:
-# ENV, OPENAI_API_KEY, CORS_ORIGINS, GOOGLE_APPLICATION_CREDENTIALS (paste JSON content)
-```
-
-### Frontend
-
-Use [Vercel](https://vercel.com) or [Netlify](https://netlify.com):
-
-```bash
-cd frontend
-npm run build
-
-# Netlify
-npx netlify-cli deploy --prod --dir=build
-
-# Or Vercel
-npx vercel --prod
-```
+For production WebSocket connections, use wss://.
 
 ---
 
-## Option C: Render.com
+## 3. Supabase Configuration
 
-Create a `render.yaml` in the project root:
+Supabase provides:
 
-```yaml
-services:
-  - type: web
-    name: mentora-backend
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    rootDir: backend
-    envVars:
-      - key: ENV
-        value: production
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: CORS_ORIGINS
-        value: https://mentora.onrender.com
+- Email/password authentication
+- User profiles
+- Session records
+- Fatigue entries
+- Row Level Security (RLS)
 
-  - type: web
-    name: mentora-frontend
-    env: static
-    buildCommand: npm install --legacy-peer-deps && npm run build
-    staticPublishPath: ./build
-    rootDir: frontend
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-```
+Required tables:
 
-```bash
-# Deploy
-render up
-```
+``text
+profiles
+sessions
+fatigue_entries
+`` 
+
+RLS policies ensure authenticated users can access only their own data.
 
 ---
 
-## WebSocket on Cloud Platforms
+## 4. WebSocket
 
-Cloud Run and Render both support WebSocket connections natively.
-For Railway, ensure HTTP/2 is enabled in the service settings.
+Mentora uses FastAPI WebSockets for real-time monitoring.
 
-For the frontend, update `REACT_APP_WS_URL` to use `wss://` (not `ws://`) in production.
+Production frontend configuration:
 
----
+``text
+wss://your-backend.onrender.com
+`` 
 
-## Custom Domain + SSL
-
-### Firebase Hosting
-```bash
-firebase hosting:sites:create mentora-app
-firebase target:apply hosting mentora-app mentora-app
-# Then add custom domain in Firebase Console → Hosting → Add custom domain
-```
-
-### Cloud Run
-```bash
-gcloud beta run domain-mappings create \
-  --service mentora-backend \
-  --domain api.yourmentora.com \
-  --region us-central1
-```
+The backend authenticates WebSocket connections using the Supabase access token.
 
 ---
 
-## Environment Variables Summary
+## 5. Production Checklist
 
-| Variable | Backend | Frontend | Required |
-|----------|---------|----------|----------|
-| `GOOGLE_APPLICATION_CREDENTIALS` | ✓ | — | Yes |
-| `OPENAI_API_KEY` | ✓ | — | No (fallback) |
-| `CORS_ORIGINS` | ✓ | — | Yes (prod) |
-| `ENV` | ✓ | — | Yes |
-| `REACT_APP_API_URL` | — | ✓ | Yes |
-| `REACT_APP_WS_URL` | — | ✓ | Yes |
-| `REACT_APP_FIREBASE_*` (×6) | — | ✓ | Yes |
-| `REACT_APP_FIREBASE_VAPID_KEY` | — | ✓ | For FCM |
+### Supabase
+
+- [ ] Create Supabase project
+- [ ] Enable Email/Password authentication
+- [ ] Create profiles table
+- [ ] Create sessions table
+- [ ] Create atigue_entries table
+- [ ] Enable RLS
+- [ ] Configure RLS policies
+
+### Render
+
+- [ ] Deploy backend
+- [ ] Configure SUPABASE_URL`r
+- [ ] Configure SUPABASE_SERVICE_ROLE_KEY`r
+- [ ] Configure CORS_ORIGINS`r
+- [ ] Configure OPENAI_API_KEY if chatbot requires it
+- [ ] Confirm /health returns ok`r
+
+### Vercel
+
+- [ ] Deploy frontend
+- [ ] Configure Supabase environment variables
+- [ ] Configure REACT_APP_API_URL`r
+- [ ] Configure REACT_APP_WS_URL`r
+- [ ] Confirm login works
+- [ ] Confirm dashboard works
+- [ ] Confirm monitoring works
+- [ ] Confirm reports work
 
 ---
 
-## Estimated Monthly Cost
+## 6. Security
 
-| Platform | Backend | Frontend | Total |
-|----------|---------|----------|-------|
-| Cloud Run + Firebase Hosting | ~$5–15 | Free | ~$5–15 |
-| Railway | ~$5 | ~$0 (Vercel) | ~$5 |
-| Render.com | Free–$7 | Free | ~$0–7 |
+Never commit:
 
-All platforms include free SSL certificates.
+``text
+.env
+.env.local
+service-role keysAPI keys
+private credentials
+`` 
+
+The Supabase publishable key may be used by the frontend.
+
+The Supabase service-role key must remain on the backend and must never be exposed to the browser.
+
+---
+
+## 7. Current Deployment
+
+Frontend:
+
+``text
+https://mentora-repoo.vercel.app
+`` 
+
+Backend:
+
+``text
+Render deployment URL
+`` 
+
+Supabase:
+
+``text
+Supabase project
+``
+
